@@ -101,5 +101,9 @@ def get_version(request=None):
         "usage": ""
     }
     if request != None:
-        response["request_info"] = request
+        response["request_info"] = {
+            "method": request.method,
+            "args": request.args,
+            "route": request.url_rule.rule
+        }
     return response
