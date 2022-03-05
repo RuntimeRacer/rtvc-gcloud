@@ -1,13 +1,16 @@
 # Based on tutorial: https://medium.com/swlh/deploying-pytorch-models-to-serverless-environments-8fcd25dc7b5c
 # Function dependencies, for example:
 # package>=version
+
 # Webserver
 requests
-# Torch
-https://download.pytorch.org/whl/cpu/torch-1.10.0%2Bcpu-cp39-cp39-linux_x86_64.whl
-https://download.pytorch.org/whl/cpu/torchaudio-0.10.0%2Bcpu-cp39-cp39-linux_x86_64.whl
-https://download.pytorch.org/whl/cpu/torchvision-0.11.1%2Bcpu-cp39-cp39-linux_x86_64.whl
-# SV2TTS Sub-depes
+
+# PyTorch
+https://download.pytorch.org/whl/cpu/torch-1.10.0%2Bcpu-cp38-cp38-linux_x86_64.whl
+https://download.pytorch.org/whl/cpu/torchaudio-0.10.0%2Bcpu-cp38-cp38-linux_x86_64.whl
+https://download.pytorch.org/whl/cpu/torchvision-0.11.1%2Bcpu-cp38-cp38-linux_x86_64.whl
+
+# SV2TTS
 librosa>=0.8.0
 matplotlib>=3.3.0
 numpy==1.19.4
