@@ -42,13 +42,13 @@ def handle_request(request: flask.Request):
             return flask.make_response(get_version(request))
 
     # Get route and forward request
-    if 'encode' in request.url_rule.rule:
+    if 'encode' in request.path:
         return flask.make_response(process_encode_request(request_data))
-    if 'synthesize' in request.url_rule.rule:
+    if 'synthesize' in request.path:
         return flask.make_response(process_synthesize_request(request_data))
-    if 'vocode' in request.url_rule.rule:
+    if 'vocode' in request.path:
         return flask.make_response(process_vocode_request(request_data))
-    if 'render' in request.url_rule.rule:
+    if 'render' in request.path:
         return flask.make_response(process_render_request(request_data))
     else:
         return flask.make_response(get_version(request))
@@ -104,6 +104,7 @@ def get_version(request=None):
         response["request_info"] = {
             "method": request.method,
             "args": request.args,
-            "route": request.url_rule.rule
+            "data": request.get_json(),
+            "route": request.path
         }
     return response
