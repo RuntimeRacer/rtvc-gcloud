@@ -35,11 +35,11 @@ def handle_request(request: flask.Request):
     request_data = request.get_json()
     if method != 'POST' or not request_data:
         if request.args:
-            return flask.make_response(get_version(method, request.args))
+            return flask.make_response(get_version(request))
         elif request_data:
-            return flask.make_response(get_version(method, request_data))
+            return flask.make_response(get_version(request))
         else:
-            return flask.make_response(get_version(method))
+            return flask.make_response(get_version(request))
 
     # Get route and forward request
     if 'encode' in request.url_rule.rule:
@@ -51,7 +51,7 @@ def handle_request(request: flask.Request):
     if 'render' in request.url_rule.rule:
         return flask.make_response(process_render_request(request_data))
     else:
-        return flask.make_response(get_version(method, request_data))
+        return flask.make_response(get_version(request))
 
 # process_encode_request
 # Input params:
@@ -94,14 +94,12 @@ def process_render_request(request_data):
     return {"success":"vocoder function triggered"}
 
 # get_version returns basic info on this gcloud function
-def get_version(request_method=None, request_args=None):
+def get_version(request=None):
     response = {
-        "function_name": __name__,
+        "function_name": "rtvc-gcloud-handler",
         "version": "0.1-beta",
         "usage": ""
     }
-    if request_method != None:
-        response["request_method"] = request_method
-    if request_args != None:
-        response["request_args"] = request_args
+    if request != None:
+        response["request_info"] = request
     return response
