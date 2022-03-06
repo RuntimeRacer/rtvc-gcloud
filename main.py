@@ -1,4 +1,5 @@
 import io
+import os
 
 from matplotlib import pyplot as plt
 import flask
@@ -15,8 +16,10 @@ from vocoder import inference as vocoder
 # Cloud Function related stuff
 app = flask.Flask(__name__)
 
-MODELS_BUCKET = 'kajispeech-models'
-ENCODER_MODEL_PATH = '/tmp/encoder.pt'
+# Env vars
+MODELS_BUCKET = os.environ['MODELS_BUCKET']
+ENCODER_MODEL_BUCKET_PATH = os.environ['ENCODER_MODEL_BUCKET_PATH']
+ENCODER_MODEL_LOCAL_PATH = os.environ['ENCODER_MODEL_LOCAL_PATH']
 
 # Hello World simple test function
 def hello_world(request):
@@ -87,19 +90,23 @@ def process_encode_request(request_data):
         # Generate the spectogram
         spectogram = Synthesizer.make_spectrogram(wav)
     except Exception as e:
-        print(e)
+        logging.log(logging.ERROR, e)
         return error_response("invalid speaker wav provided")
 
     # Download speaker encoder model from storage bucket
-    storage_client = storage.Client()
-    encoders_bucket = storage_client.get_bucket(MODELS_BUCKET)
-    encoder_model = encoders_bucket.blob("encoders/encoder_new_768.pt")
-    encoder_model.download_to_filename(ENCODER_MODEL_PATH)
+    if MODELS_BUCKET != "LOCAL":
+        storage_client = storage.Client()
+        encoders_bucket = storage_client.get_bucket(MODELS_BUCKET)
+        encoder_model = encoders_bucket.blob(ENCODER_MODEL_BUCKET_PATH)
+        encoder_model.download_to_filename(ENCODER_MODEL_LOCAL_PATH)
 
     # Load Speaker encoder
-    start = timer()
-    encoder.load_model(ENCODER_MODEL_PATH)
-    logging.log(logging.DEBUG, "Successfully loaded encoder (%dms)." % int(1000 * (timer() - start)))
+    if os.path.exists(ENCODER_MODEL_LOCAL_PATH):
+        start = timer()
+        encoder.load_model(ENCODER_MODEL_LOCAL_PATH,"cpu")
+        logging.log(logging.DEBUG, "Successfully loaded encoder (%dms)." % int(1000 * (timer() - start)))
+    else:
+        return error_response("encoder model not found")
 
     # process wav and generate embedding
     encoder_wav = encoder.preprocess_wav(wav)
@@ -110,7 +117,7 @@ def process_encode_request(request_data):
 
     # Build response
     response = {
-        "embed": base64.b64encode(embed),
+        "embed": base64.b64encode(embed).decode('utf-8'),
         "embed_graph": None,
         "embed_mel": render_spectogram(spectogram)
     }
