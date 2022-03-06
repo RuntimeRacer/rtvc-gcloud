@@ -1,5 +1,6 @@
 import io
 
+from matplotlib import pyplot as plt
 import flask
 import base64
 import logging
@@ -82,10 +83,11 @@ def process_encode_request(request_data):
     # Generate the spectogram - if this fails, audio data provided is invalid
     try:
         # Decode the wav from payload
-        wav = base64.decodebytes(wav)
+        wav = base64.b64decode(wav)
         # Generate the spectogram
         spectogram = Synthesizer.make_spectrogram(wav)
-    except:
+    except Exception as e:
+        print(e)
         return error_response("invalid speaker wav provided")
 
     # Download speaker encoder model from storage bucket
@@ -110,7 +112,7 @@ def process_encode_request(request_data):
     response = {
         "embed": base64.b64encode(embed),
         "embed_graph": None,
-        "embed_mel": base64.b64encode(spectogram)
+        "embed_mel": render_spectogram(spectogram)
     }
 
     return flask.make_response(response)
@@ -165,3 +167,23 @@ def get_version(request=None):
 def error_response(message, code=400):
     response = flask.make_response(message, code)
     return response
+
+# renders a mel spectogram as a PNG
+def render_spectogram(spectogram):
+    fig, spec_ax = plt.subplots(1, 1, figsize=(10, 2.25), facecolor="#F0F0F0")
+    fig.subplots_adjust(left=0.00, bottom=0.00, right=1, top=1)
+
+    if spectogram is not None:
+        spec_ax.imshow(spectogram, aspect="auto", interpolation="none")
+
+    spec_ax.set_xticks([])
+    spec_ax.set_yticks([])
+    spec_ax.figure.canvas.draw()
+    # fig.savefig('test.png') DEBUG code
+
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format='png')
+    buffer.seek(0)
+    spectogram_bytes = buffer.getvalue()
+    img_str = "data:image/png;base64," + base64.b64encode(spectogram_bytes).decode()
+    return img_str
