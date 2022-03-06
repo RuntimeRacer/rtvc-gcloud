@@ -77,12 +77,12 @@ def handle_request(request: flask.Request):
 # - mel spectogram graph generated from input wav
 def process_encode_request(request_data):
     # Gather data from request
-    wav = request_data["speaker_wav"]
+    wav = request_data["speaker_wav"] if "speaker_wav" in request_data else None
 
     # Generate the spectogram - if this fails, audio data provided is invalid
     try:
         # Decode the wav from payload
-        wav = base64.b64decode(wav)
+        wav = base64.decodebytes(wav)
         # Generate the spectogram
         spectogram = Synthesizer.make_spectrogram(wav)
     except:
