@@ -1,6 +1,21 @@
-import flask
+import io
 
+import flask
+import base64
+import logging
+from time import perf_counter as timer
+from google.cloud import storage
+
+# SV2TTS
+from encoder import inference as encoder
+from synthesizer.inference import Synthesizer
+from vocoder import inference as vocoder
+
+# Cloud Function related stuff
 app = flask.Flask(__name__)
+
+MODELS_BUCKET = 'kajispeech-models'
+ENCODER_MODEL_PATH = '/tmp/encoder.pt'
 
 # Hello World simple test function
 def hello_world(request):
@@ -43,13 +58,13 @@ def handle_request(request: flask.Request):
 
     # Get route and forward request
     if 'encode' in request.path:
-        return flask.make_response(process_encode_request(request_data))
+        return process_encode_request(request_data)
     if 'synthesize' in request.path:
-        return flask.make_response(process_synthesize_request(request_data))
+        return process_synthesize_request(request_data)
     if 'vocode' in request.path:
-        return flask.make_response(process_vocode_request(request_data))
+        return process_vocode_request(request_data)
     if 'render' in request.path:
-        return flask.make_response(process_render_request(request_data))
+        return process_render_request(request_data)
     else:
         return flask.make_response(get_version(request))
 
@@ -59,9 +74,46 @@ def handle_request(request: flask.Request):
 # Returns:
 # - speaker embedding generated from input wav
 # - embedding graph generated from input wav
+# - mel spectogram graph generated from input wav
 def process_encode_request(request_data):
+    # Gather data from request
+    wav = request_data["speaker_wav"]
+
+    # Generate the spectogram - if this fails, audio data provided is invalid
+    try:
+        # Decode the wav from payload
+        wav = base64.b64decode(wav)
+        # Generate the spectogram
+        spectogram = Synthesizer.make_spectrogram(wav)
+    except:
+        return error_response("invalid speaker wav provided")
+
+    # Download speaker encoder model from storage bucket
+    storage_client = storage.Client()
+    encoders_bucket = storage_client.get_bucket(MODELS_BUCKET)
+    encoder_model = encoders_bucket.blob("encoders/encoder_new_768.pt")
+    encoder_model.download_to_filename(ENCODER_MODEL_PATH)
+
+    # Load Speaker encoder
+    start = timer()
+    encoder.load_model(ENCODER_MODEL_PATH)
+    logging.log(logging.DEBUG, "Successfully loaded encoder (%dms)." % int(1000 * (timer() - start)))
+
+    # process wav and generate embedding
+    encoder_wav = encoder.preprocess_wav(wav)
+    embed = encoder.embed_utterance(encoder_wav)
+
+    # Generate the embed graph
     # TODO
-    return {"success":"encoder function triggered"}
+
+    # Build response
+    response = {
+        "embed": base64.b64encode(embed),
+        "embed_graph": None,
+        "embed_mel": base64.b64encode(spectogram)
+    }
+
+    return flask.make_response(response)
 
 # process_synthesize_request
 # Input params:
@@ -107,4 +159,9 @@ def get_version(request=None):
             "data": request.get_json(),
             "route": request.path
         }
+    return response
+
+# creates a flask response
+def error_response(message, code=400):
+    response = flask.make_response(message, code)
     return response

@@ -1,4 +1,4 @@
-from encoder.params import *
+from encoder.hparams import *
 from encoder.model import SpeakerEncoder
 from encoder.audio import preprocess_wav   # We want to expose this function from here
 from matplotlib import cm

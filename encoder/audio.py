@@ -1,5 +1,7 @@
+import io
+
 from scipy.ndimage.morphology import binary_dilation
-from encoder.params import *
+from encoder.hparams import *
 from pathlib import Path
 from typing import Optional, Union
 from warnings import warn
@@ -17,7 +19,7 @@ except:
 int16_max = (2 ** 15) - 1
 
 
-def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray],
+def preprocess_wav(wav,
                    source_sr: Optional[int] = None,
                    normalize: Optional[bool] = True,
                    trim_silence: Optional[bool] = True):
@@ -25,24 +27,21 @@ def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray],
     Applies the preprocessing operations used in training the Speaker Encoder to a waveform
     either on disk or in memory. The waveform will be resampled to match the data hyperparameters.
 
-    :param fpath_or_wav: either a filepath to an audio file (many extensions are supported, not
+    :param wav: either a filepath to an audio file (many extensions are supported, not
     just .wav), either the waveform as a numpy array of floats.
     :param source_sr: if passing an audio waveform, the sampling rate of the waveform before
     preprocessing. After preprocessing, the waveform's sampling rate will match the data
     hyperparameters. If passing a filepath, the sampling rate will be automatically detected and
     this argument will be ignored.
     """
-    # Load the wav from disk if needed
-    if isinstance(fpath_or_wav, str) or isinstance(fpath_or_wav, Path):
-        # print("Loading: {0}".format(fpath_or_wav))
-        try:
-            wav, source_sr = librosa.load(fpath_or_wav, sr=None)
-        except (ValueError, RuntimeError, NoBackendError) as err:
-            # Unable to load.
-            print("Unable to load audio file {0}: {1}".format(fpath_or_wav, err))
-            return []
-    else:
-        wav = fpath_or_wav
+
+    # Load the wav as a fake file stream
+    try:
+        wav, source_sr = librosa.load(io.BytesIO(wav), sr=None)
+    except (ValueError, RuntimeError, NoBackendError) as err:
+        # Unable to load.
+        print("Unable to load audio: {0}".format(err))
+        return []
 
     # Resample the wav if needed
     if source_sr is not None and source_sr != sampling_rate:
@@ -50,7 +49,7 @@ def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray],
             wav = librosa.resample(wav, source_sr, sampling_rate)
         except ValueError as err:
             # Unable to resample.
-            print("Unable to resample audio file {0}: {1}".format(fpath_or_wav, err))
+            print("Unable to resample audio: {0}".format(err))
             return []
 
     # Apply the preprocessing: normalize volume and shorten long silences
