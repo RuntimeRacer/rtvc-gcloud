@@ -1,7 +1,6 @@
-import io
 import os
 
-from matplotlib import pyplot as plt
+import render
 import flask
 import base64
 import logging
@@ -103,7 +102,7 @@ def process_encode_request(request_data):
     # Load Speaker encoder
     if os.path.exists(ENCODER_MODEL_LOCAL_PATH):
         start = timer()
-        encoder.load_model(ENCODER_MODEL_LOCAL_PATH,"cpu")
+        encoder.load_model(ENCODER_MODEL_LOCAL_PATH)
         logging.log(logging.DEBUG, "Successfully loaded encoder (%dms)." % int(1000 * (timer() - start)))
     else:
         return error_response("encoder model not found")
@@ -112,14 +111,11 @@ def process_encode_request(request_data):
     encoder_wav = encoder.preprocess_wav(wav)
     embed = encoder.embed_utterance(encoder_wav)
 
-    # Generate the embed graph
-    # TODO
-
     # Build response
     response = {
         "embed": base64.b64encode(embed).decode('utf-8'),
-        "embed_graph": None,
-        "embed_mel": render_spectogram(spectogram)
+        "embed_graph": render.embedding(embed),
+        "embed_mel": render.spectogram(spectogram)
     }
 
     return flask.make_response(response)
@@ -175,22 +171,3 @@ def error_response(message, code=400):
     response = flask.make_response(message, code)
     return response
 
-# renders a mel spectogram as a PNG
-def render_spectogram(spectogram):
-    fig, spec_ax = plt.subplots(1, 1, figsize=(10, 2.25), facecolor="#F0F0F0")
-    fig.subplots_adjust(left=0.00, bottom=0.00, right=1, top=1)
-
-    if spectogram is not None:
-        spec_ax.imshow(spectogram, aspect="auto", interpolation="none")
-
-    spec_ax.set_xticks([])
-    spec_ax.set_yticks([])
-    spec_ax.figure.canvas.draw()
-    # fig.savefig('test.png') DEBUG code
-
-    buffer = io.BytesIO()
-    fig.savefig(buffer, format='png')
-    buffer.seek(0)
-    spectogram_bytes = buffer.getvalue()
-    img_str = "data:image/png;base64," + base64.b64encode(spectogram_bytes).decode()
-    return img_str
