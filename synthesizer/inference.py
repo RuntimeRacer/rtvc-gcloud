@@ -16,7 +16,7 @@ class Synthesizer:
     sample_rate = hparams.sample_rate
     hparams = hparams
     
-    def __init__(self, model_fpath: Path, verbose=True, device=None):
+    def __init__(self, model_fpath: Path, verbose=True):
         """
         The model isn't instantiated and loaded in memory until needed or until load() is called.
         
@@ -27,13 +27,11 @@ class Synthesizer:
         self.verbose = verbose
  
         # Check for GPU
-        if device is None:
-            if torch.cuda.is_available():
-                self.device = torch.device("cuda")
-            else:
-                self.device = torch.device("cpu")
+        if torch.cuda.is_available():
+            self.device = torch.device("cuda")
         else:
-            self.device = torch.device(device)
+            self.device = torch.device("cpu")
+
         if self.verbose:
             print("Synthesizer using device:", self.device)
         

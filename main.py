@@ -1,12 +1,15 @@
+import io
 import os
 import pathlib
 
 import render
 import flask
+import json
 import base64
 import logging
 import torch
 import numpy as np
+import soundfile as sf
 
 from time import perf_counter as timer
 from google.cloud import storage
@@ -16,6 +19,7 @@ from google.cloud import logging as g_log
 from encoder import inference as encoder
 from synthesizer.inference import Synthesizer
 from vocoder import inference as vocoder
+from vocoder import audio as voc_audio
 
 # Env vars
 MODELS_BUCKET = os.environ['MODELS_BUCKET']
@@ -107,20 +111,22 @@ def process_encode_request(request_data):
         logging.log(logging.ERROR, e)
         return error_response("invalid speaker wav provided")
 
-    # Download speaker encoder model from storage bucket
-    if MODELS_BUCKET != "LOCAL" and not os.path.exists(ENCODER_MODEL_LOCAL_PATH):
-        storage_client = storage.Client()
-        encoders_bucket = storage_client.get_bucket(MODELS_BUCKET)
-        encoder_model = encoders_bucket.blob(ENCODER_MODEL_BUCKET_PATH)
-        encoder_model.download_to_filename(ENCODER_MODEL_LOCAL_PATH)
+    # Load the model
+    if not encoder.is_loaded():
+        # Download speaker encoder model from storage bucket
+        if MODELS_BUCKET != "LOCAL" and not os.path.exists(ENCODER_MODEL_LOCAL_PATH):
+            storage_client = storage.Client()
+            bucket = storage_client.get_bucket(MODELS_BUCKET)
+            model = bucket.blob(ENCODER_MODEL_BUCKET_PATH)
+            model.download_to_filename(ENCODER_MODEL_LOCAL_PATH)
 
-    # Load Speaker encoder
-    if os.path.exists(ENCODER_MODEL_LOCAL_PATH):
-        start = timer()
-        encoder.load_model(pathlib.Path(ENCODER_MODEL_LOCAL_PATH))
-        logging.log(logging.INFO, "Successfully loaded encoder (%dms)." % int(1000 * (timer() - start)))
-    else:
-        return error_response("encoder model not found", 500)
+        # Load Speaker encoder
+        if os.path.exists(ENCODER_MODEL_LOCAL_PATH):
+            start = timer()
+            encoder.load_model(pathlib.Path(ENCODER_MODEL_LOCAL_PATH))
+            logging.log(logging.INFO, "Successfully loaded encoder (%dms)." % int(1000 * (timer() - start)))
+        else:
+            return error_response("encoder model not found", 500)
 
     # process wav and generate embedding
     encoder_wav = encoder.preprocess_wav(wav)
@@ -130,7 +136,7 @@ def process_encode_request(request_data):
     response = {
         "embed": base64.b64encode(embed).decode('utf-8'),
         "embed_graph": render.embedding(embed),
-        "embed_mel": render.spectogram(spectogram)
+        "embed_mel_graph": render.spectogram(spectogram)
     }
 
     return flask.make_response(response)
@@ -162,7 +168,7 @@ def process_synthesize_request(request_data):
         text = base64.decodebytes(text.encode('utf-8')).decode('utf-8')
     except Exception as e:
         logging.log(logging.ERROR, e)
-        return error_response("invalid speaker wav provided")
+        return error_response("invalid embedding or text provided")
 
     # Apply seed
     if seed is None:
@@ -177,14 +183,15 @@ def process_synthesize_request(request_data):
             return error_response("invalid generation seed provided")
     logging.log(logging.INFO, "Using seed: %d" % seed)
 
+    # Load the model FIXME: Make this static method as the other 2
     # Download synthesizer model from storage bucket
     if MODELS_BUCKET != "LOCAL" and not os.path.exists(SYNTHESIZER_MODEL_LOCAL_PATH):
         storage_client = storage.Client()
-        encoders_bucket = storage_client.get_bucket(MODELS_BUCKET)
-        encoder_model = encoders_bucket.blob(SYNTHESIZER_MODEL_BUCKET_PATH)
-        encoder_model.download_to_filename(SYNTHESIZER_MODEL_LOCAL_PATH)
+        bucket = storage_client.get_bucket(MODELS_BUCKET)
+        model = bucket.blob(SYNTHESIZER_MODEL_BUCKET_PATH)
+        model.download_to_filename(SYNTHESIZER_MODEL_LOCAL_PATH)
 
-    # Load Speaker encoder
+    # Load synthesizer
     if os.path.exists(SYNTHESIZER_MODEL_LOCAL_PATH):
         start = timer()
         synthesizer = Synthesizer(pathlib.Path(SYNTHESIZER_MODEL_LOCAL_PATH))
@@ -196,13 +203,23 @@ def process_synthesize_request(request_data):
     texts = text.split("\n")
     embeds = [embed] * len(texts)
     sub_spectograms = synthesizer.synthesize_spectrograms(texts, embeds)
+
+    # Get speech breaks and store as JSON list
+    breaks = [subspec.shape[1] for subspec in sub_spectograms]
+    breaks_json = json.dumps(breaks)
+
+    # Combine full spectogram
     full_spectogram = np.concatenate(sub_spectograms, axis=1)
     full_spectogram = full_spectogram.copy(order='C') # Make C-Contigous to allow encoding - might need to be reverted for vocoding
+    full_spectogram_json = json.dumps(full_spectogram.tolist())
 
     # Build response
     response = {
-        "synthesized": base64.b64encode(full_spectogram).decode('utf-8'),
-        "synthesized_mel": render.spectogram(full_spectogram)
+        "synthesized": {
+            "mel": base64.b64encode(full_spectogram_json.encode('utf-8')).decode('utf-8'),
+            "breaks": base64.b64encode(breaks_json.encode('utf-8')).decode('utf-8')
+        },
+        "synthesized_mel_graph": render.spectogram(full_spectogram)
     }
 
     return flask.make_response(response)
@@ -212,9 +229,88 @@ def process_synthesize_request(request_data):
 # - binary spectogram of synthesized text
 # (- fixed neural network seed)
 # Returns:
-# - binary wav file of
+# - binary wav file of vocoded spectogram
 def process_vocode_request(request_data):
-    return {"success":"vocoder function triggered"}
+    # Gather data from request
+    synthesized = request_data["synthesized"] if "synthesized" in request_data else None
+    seed = request_data["seed"] if "seed" in request_data else None
+
+    # Check input
+    if synthesized is None:
+        return error_response("no synthesized data provided")
+
+    # Get mel and breaks
+    syn_mel = synthesized["mel"] if "mel" in synthesized else None
+    syn_breaks = synthesized["breaks"] if "breaks" in synthesized else None
+    if syn_mel is None or syn_breaks is None:
+        return error_response("invalid synthesis data provided")
+
+    # Decode input from base64
+    try:
+        syn_breaks = base64.b64decode(syn_breaks.encode('utf-8'))
+        syn_breaks = json.loads(syn_breaks)
+        syn_mel = base64.b64decode(syn_mel.encode('utf-8'))
+        syn_mel = json.loads(syn_mel)
+        syn_mel = np.array(syn_mel, dtype=np.float32)
+    except Exception as e:
+        logging.log(logging.ERROR, e)
+        return error_response("invalid synthesis data provided")
+
+    # Apply seed
+    if seed is None:
+        seed = torch.seed()
+    else:
+        try:
+            manual_seed = int(seed)
+            torch.manual_seed(manual_seed)
+            seed = manual_seed
+        except Exception as e:
+            logging.log(logging.ERROR, e)
+            return error_response("invalid generation seed provided")
+    logging.log(logging.INFO, "Using seed: %d" % seed)
+
+    # Load the model
+    if not vocoder.is_loaded():
+        # Download vocoder model from storage bucket
+        if MODELS_BUCKET != "LOCAL" and not os.path.exists(VOCODER_MODEL_LOCAL_PATH):
+            storage_client = storage.Client()
+            bucket = storage_client.get_bucket(MODELS_BUCKET)
+            model = bucket.blob(VOCODER_MODEL_BUCKET_PATH)
+            model.download_to_filename(VOCODER_MODEL_LOCAL_PATH)
+
+        # Load vocoder
+        if os.path.exists(VOCODER_MODEL_LOCAL_PATH):
+            start = timer()
+            vocoder.load_model(pathlib.Path(VOCODER_MODEL_LOCAL_PATH))
+            logging.log(logging.INFO, "Successfully loaded vocoder (%dms)." % int(1000 * (timer() - start)))
+        else:
+            return error_response("vocoder model not found", 500)
+
+    # Apply vocoder on mel
+    wav = vocoder.infer_waveform(syn_mel)
+
+    # Add breaks
+    b_ends = np.cumsum(np.array(syn_breaks) * Synthesizer.hparams.hop_size)
+    b_starts = np.concatenate(([0], b_ends[:-1]))
+    wavs = [wav[start:end] for start, end, in zip(b_starts, b_ends)]
+    syn_breaks = [np.zeros(int(0.15 * Synthesizer.sample_rate))] * len(syn_breaks)
+    wav = np.concatenate([i for w, b in zip(wavs, syn_breaks) for i in (w, b)])
+
+    # Apply optimizations
+    wav = encoder.preprocess_wav(wav) # Trim silences
+    wav = wav / np.abs(wav).max() * 0.97 # Normalize
+
+    # Encode as WAV
+    with io.BytesIO() as handle:
+        sf.write(handle, wav.astype(np.float32), samplerate=Synthesizer.sample_rate, format='wav')
+        wav_string = handle.getvalue()
+
+    # Build response
+    response = {
+        "generated_wav": base64.b64encode(wav_string).decode('utf-8')
+    }
+
+    return flask.make_response(response)
 
 # process_render_request -> Performs synthesize & vocode in a single step
 # Input params:

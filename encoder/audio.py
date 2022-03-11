@@ -36,12 +36,13 @@ def preprocess_wav(wav,
     """
 
     # Load the wav as a fake file stream
-    try:
-        wav, source_sr = librosa.load(io.BytesIO(wav), sr=None)
-    except (ValueError, RuntimeError, NoBackendError) as err:
-        # Unable to load.
-        print("Unable to load audio: {0}".format(err))
-        return []
+    if isinstance(wav, (bytes, bytearray)):
+        try:
+            wav, source_sr = librosa.load(io.BytesIO(wav), sr=None)
+        except (ValueError, RuntimeError, NoBackendError) as err:
+            # Unable to load.
+            print("Unable to load audio: {0}".format(err))
+            return []
 
     # Resample the wav if needed
     if source_sr is not None and source_sr != sampling_rate:

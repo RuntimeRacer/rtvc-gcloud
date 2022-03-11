@@ -151,9 +151,8 @@ class WaveRNN(nn.Module):
         x = F.relu(self.fc2(x))
         return self.fc3(x)
 
-    def generate(self, mels, batched, target, overlap, mu_law, progress_callback=None):
+    def generate(self, mels, batched, target, overlap, mu_law):
         mu_law = mu_law if self.mode == 'RAW' else False
-        progress_callback = progress_callback
 
         self.eval()
         output = []
@@ -229,10 +228,6 @@ class WaveRNN(nn.Module):
                     x = sample.unsqueeze(-1)
                 else:
                     raise RuntimeError("Unknown model mode value - ", self.mode)
-
-                if i % 100 == 0:
-                    gen_rate = (i + 1) / (time.time() - start) * b_size / 1000
-                    progress_callback(i, seq_len, b_size, gen_rate)
 
         output = torch.stack(output).transpose(0, 1)
         output = output.cpu().numpy()
