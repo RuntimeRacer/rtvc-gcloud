@@ -1,10 +1,12 @@
 import os
+import pathlib
 
 import render
 import flask
 import base64
 import logging
 import torch
+import numpy as np
 
 from time import perf_counter as timer
 from google.cloud import storage
@@ -15,11 +17,6 @@ from encoder import inference as encoder
 from synthesizer.inference import Synthesizer
 from vocoder import inference as vocoder
 
-# Cloud Function related stuff
-app = flask.Flask(__name__)
-log_client = g_log.Client()
-log_client.setup_logging(log_level=logging.INFO)
-
 # Env vars
 MODELS_BUCKET = os.environ['MODELS_BUCKET']
 ENCODER_MODEL_BUCKET_PATH = os.environ['ENCODER_MODEL_BUCKET_PATH']
@@ -28,6 +25,12 @@ SYNTHESIZER_MODEL_BUCKET_PATH = os.environ['SYNTHESIZER_MODEL_BUCKET_PATH']
 SYNTHESIZER_MODEL_LOCAL_PATH = os.environ['SYNTHESIZER_MODEL_LOCAL_PATH']
 VOCODER_MODEL_BUCKET_PATH = os.environ['VOCODER_MODEL_BUCKET_PATH']
 VOCODER_MODEL_LOCAL_PATH = os.environ['VOCODER_MODEL_LOCAL_PATH']
+
+# Cloud Function related stuff
+app = flask.Flask(__name__)
+if MODELS_BUCKET != "LOCAL":
+    log_client = g_log.Client()
+    log_client.setup_logging(log_level=logging.INFO)
 
 # Hello World simple test function
 def hello_world(request):
@@ -114,7 +117,7 @@ def process_encode_request(request_data):
     # Load Speaker encoder
     if os.path.exists(ENCODER_MODEL_LOCAL_PATH):
         start = timer()
-        encoder.load_model(ENCODER_MODEL_LOCAL_PATH)
+        encoder.load_model(pathlib.Path(ENCODER_MODEL_LOCAL_PATH))
         logging.log(logging.INFO, "Successfully loaded encoder (%dms)." % int(1000 * (timer() - start)))
     else:
         return error_response("encoder model not found", 500)
@@ -139,6 +142,7 @@ def process_encode_request(request_data):
 # (- fixed neural network seed)
 # Returns:
 # - binary spectogram of synthesized text
+# - mel spectogram graph generated from output spectogram
 def process_synthesize_request(request_data):
     # Gather data from request
     embed = request_data["speaker_embed"] if "speaker_embed" in request_data else None
@@ -154,7 +158,8 @@ def process_synthesize_request(request_data):
     # Decode input from base64
     try:
         embed = base64.b64decode(embed.encode('utf-8'))
-        text = base64.b64decode(text.encode('utf-8'))
+        embed = np.frombuffer(embed, dtype=np.float32)
+        text = base64.decodebytes(text.encode('utf-8')).decode('utf-8')
     except Exception as e:
         logging.log(logging.ERROR, e)
         return error_response("invalid speaker wav provided")
@@ -182,17 +187,25 @@ def process_synthesize_request(request_data):
     # Load Speaker encoder
     if os.path.exists(SYNTHESIZER_MODEL_LOCAL_PATH):
         start = timer()
-        synthesizer = Synthesizer(SYNTHESIZER_MODEL_LOCAL_PATH)
+        synthesizer = Synthesizer(pathlib.Path(SYNTHESIZER_MODEL_LOCAL_PATH))
         logging.log(logging.INFO, "Successfully loaded synthesizer (%dms)." % int(1000 * (timer() - start)))
     else:
         return error_response("synthesizer model not found", 500)
 
-    # Process multiline text as individual
+    # Process multiline text as individual synthesis => Maybe Possibility for threaded speedup here
+    texts = text.split("\n")
+    embeds = [embed] * len(texts)
+    sub_spectograms = synthesizer.synthesize_spectrograms(texts, embeds)
+    full_spectogram = np.concatenate(sub_spectograms, axis=1)
+    full_spectogram = full_spectogram.copy(order='C') # Make C-Contigous to allow encoding - might need to be reverted for vocoding
 
+    # Build response
+    response = {
+        "synthesized": base64.b64encode(full_spectogram).decode('utf-8'),
+        "synthesized_mel": render.spectogram(full_spectogram)
+    }
 
-
-    # TODO
-    return {"success":"synthesizer function triggered"}
+    return flask.make_response(response)
 
 # process_vocode_request
 # Input params:

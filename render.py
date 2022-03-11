@@ -16,7 +16,7 @@ def spectogram(spectogram):
     spec_ax.set_xticks([])
     spec_ax.set_yticks([])
     spec_ax.figure.canvas.draw()
-    # fig.savefig('test.png') # DEBUG code
+    fig.savefig('test.png') # DEBUG code
 
     buffer = io.BytesIO()
     fig.savefig(buffer, format='png')
