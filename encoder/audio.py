@@ -46,7 +46,7 @@ def preprocess_wav(wav,
     # Resample the wav if needed
     if source_sr is not None and source_sr != sampling_rate:
         try:
-            wav = librosa.resample(wav, source_sr, sampling_rate)
+            wav = librosa.resample(y=wav, orig_sr=source_sr, target_sr=sampling_rate)
         except ValueError as err:
             # Unable to resample.
             print("Unable to resample audio: {0}".format(err))
@@ -65,7 +65,7 @@ def wav_to_mel_spectrogram(wav):
     Note: this not a log-mel spectrogram.
     """
     frames = librosa.feature.melspectrogram(
-        wav,
+        y=wav,
         sr=sampling_rate,
         n_fft=int(sampling_rate * mel_window_length / 1000),
         hop_length=int(sampling_rate * mel_window_step / 1000),

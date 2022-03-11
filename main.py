@@ -18,7 +18,7 @@ from vocoder import inference as vocoder
 # Cloud Function related stuff
 app = flask.Flask(__name__)
 log_client = g_log.Client()
-log_client.setup_logging(log_level=logging.DEBUG)
+log_client.setup_logging(log_level=logging.INFO)
 
 # Env vars
 MODELS_BUCKET = os.environ['MODELS_BUCKET']
@@ -115,7 +115,7 @@ def process_encode_request(request_data):
     if os.path.exists(ENCODER_MODEL_LOCAL_PATH):
         start = timer()
         encoder.load_model(ENCODER_MODEL_LOCAL_PATH)
-        logging.log(logging.DEBUG, "Successfully loaded encoder (%dms)." % int(1000 * (timer() - start)))
+        logging.log(logging.INFO, "Successfully loaded encoder (%dms)." % int(1000 * (timer() - start)))
     else:
         return error_response("encoder model not found", 500)
 
@@ -170,7 +170,7 @@ def process_synthesize_request(request_data):
         except Exception as e:
             logging.log(logging.ERROR, e)
             return error_response("invalid generation seed provided")
-    logging.log(logging.DEBUG, "Using seed: %d" % seed)
+    logging.log(logging.INFO, "Using seed: %d" % seed)
 
     # Download synthesizer model from storage bucket
     if MODELS_BUCKET != "LOCAL" and not os.path.exists(SYNTHESIZER_MODEL_LOCAL_PATH):
@@ -183,7 +183,7 @@ def process_synthesize_request(request_data):
     if os.path.exists(SYNTHESIZER_MODEL_LOCAL_PATH):
         start = timer()
         synthesizer = Synthesizer(SYNTHESIZER_MODEL_LOCAL_PATH)
-        logging.log(logging.DEBUG, "Successfully loaded synthesizer (%dms)." % int(1000 * (timer() - start)))
+        logging.log(logging.INFO, "Successfully loaded synthesizer (%dms)." % int(1000 * (timer() - start)))
     else:
         return error_response("synthesizer model not found", 500)
 
