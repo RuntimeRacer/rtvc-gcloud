@@ -3,6 +3,7 @@
 # package>=version
 
 # Webserver
+flask
 requests
 google-cloud-storage
 google-cloud-logging

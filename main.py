@@ -343,3 +343,6 @@ def error_response(message, code=400):
     response = flask.make_response(message, code)
     return response
 
+
+if __name__ == "__main__":
+    app.run(debug=True)
