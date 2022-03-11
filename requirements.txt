@@ -5,6 +5,7 @@
 # Webserver
 flask
 requests
+functions-framework==3.*
 google-cloud-storage
 google-cloud-logging
 

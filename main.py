@@ -36,25 +36,6 @@ if MODELS_BUCKET != "LOCAL":
     log_client = g_log.Client()
     log_client.setup_logging(log_level=logging.INFO)
 
-# Hello World simple test function
-def hello_world(request):
-    """Responds to any HTTP request.
-    Args:
-        request (flask.Request): HTTP request object.
-    Returns:
-        The response text or any set of values that can be turned into a
-        Response object using
-        `make_response <http://flask.pocoo.org/docs/1.0/api/#flask.Flask.make_response>`.
-    """
-    request_json = request.get_json()
-    if request.args and 'message' in request.args:
-        return request.args.get('message')
-    elif request_json and 'message' in request_json:
-        return request_json['message']
-    else:
-        return f'Hello World!'
-
-
 # entry point of this gcloud function
 # Expects requests to be sent via POST method.
 # In case of a non-POST Request it will respond with get_version().
@@ -342,7 +323,3 @@ def get_version(request=None):
 def error_response(message, code=400):
     response = flask.make_response(message, code)
     return response
-
-
-if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 80)))
