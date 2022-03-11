@@ -8,6 +8,7 @@ import torch
 
 from time import perf_counter as timer
 from google.cloud import storage
+from google.cloud import logging as g_log
 
 # SV2TTS
 from encoder import inference as encoder
@@ -16,6 +17,8 @@ from vocoder import inference as vocoder
 
 # Cloud Function related stuff
 app = flask.Flask(__name__)
+log_client = g_log.Client()
+log_client.setup_logging(log_level=logging.DEBUG)
 
 # Env vars
 MODELS_BUCKET = os.environ['MODELS_BUCKET']
@@ -25,10 +28,6 @@ SYNTHESIZER_MODEL_BUCKET_PATH = os.environ['SYNTHESIZER_MODEL_BUCKET_PATH']
 SYNTHESIZER_MODEL_LOCAL_PATH = os.environ['SYNTHESIZER_MODEL_LOCAL_PATH']
 VOCODER_MODEL_BUCKET_PATH = os.environ['VOCODER_MODEL_BUCKET_PATH']
 VOCODER_MODEL_LOCAL_PATH = os.environ['VOCODER_MODEL_LOCAL_PATH']
-
-# setup logging
-logger = logging.getLogger()
-logger.addHandler(logging.StreamHandler())
 
 # Hello World simple test function
 def hello_world(request):
@@ -102,7 +101,7 @@ def process_encode_request(request_data):
         # Generate the spectogram
         spectogram = Synthesizer.make_spectrogram(wav)
     except Exception as e:
-        logger.log(logging.ERROR, e)
+        logging.log(logging.ERROR, e)
         return error_response("invalid speaker wav provided")
 
     # Download speaker encoder model from storage bucket
@@ -116,7 +115,7 @@ def process_encode_request(request_data):
     if os.path.exists(ENCODER_MODEL_LOCAL_PATH):
         start = timer()
         encoder.load_model(ENCODER_MODEL_LOCAL_PATH)
-        logger.log(logging.DEBUG, "Successfully loaded encoder (%dms)." % int(1000 * (timer() - start)))
+        logging.log(logging.DEBUG, "Successfully loaded encoder (%dms)." % int(1000 * (timer() - start)))
     else:
         return error_response("encoder model not found", 500)
 
@@ -157,7 +156,7 @@ def process_synthesize_request(request_data):
         embed = base64.b64decode(embed.encode('utf-8'))
         text = base64.b64decode(text.encode('utf-8'))
     except Exception as e:
-        logger.log(logging.ERROR, e)
+        logging.log(logging.ERROR, e)
         return error_response("invalid speaker wav provided")
 
     # Apply seed
@@ -169,9 +168,9 @@ def process_synthesize_request(request_data):
             torch.manual_seed(manual_seed)
             seed = manual_seed
         except Exception as e:
-            logger.log(logging.ERROR, e)
+            logging.log(logging.ERROR, e)
             return error_response("invalid generation seed provided")
-    logger.log(logging.DEBUG, "Using seed: %d" % seed)
+    logging.log(logging.DEBUG, "Using seed: %d" % seed)
 
     # Download synthesizer model from storage bucket
     if MODELS_BUCKET != "LOCAL" and not os.path.exists(SYNTHESIZER_MODEL_LOCAL_PATH):
@@ -184,7 +183,7 @@ def process_synthesize_request(request_data):
     if os.path.exists(SYNTHESIZER_MODEL_LOCAL_PATH):
         start = timer()
         synthesizer = Synthesizer(SYNTHESIZER_MODEL_LOCAL_PATH)
-        logger.log(logging.DEBUG, "Successfully loaded synthesizer (%dms)." % int(1000 * (timer() - start)))
+        logging.log(logging.DEBUG, "Successfully loaded synthesizer (%dms)." % int(1000 * (timer() - start)))
     else:
         return error_response("synthesizer model not found", 500)
 

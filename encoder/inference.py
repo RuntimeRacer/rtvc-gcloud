@@ -1,3 +1,5 @@
+import logging
+
 from encoder.hparams import *
 from encoder.model import SpeakerEncoder
 from encoder.audio import preprocess_wav   # We want to expose this function from here
@@ -33,7 +35,7 @@ def load_model(weights_fpath: Path, device=None):
     checkpoint = torch.load(weights_fpath, _device)
     _model.load_state_dict(checkpoint["model_state"])
     _model.eval()
-    print("Loaded encoder \"%s\" trained to step %d" % (Path(weights_fpath).name, checkpoint["step"]))
+    logging.log(logging.DEBUG, "Loaded encoder \"%s\" trained to step %d" % (Path(weights_fpath).name, checkpoint["step"]))
     
     
 def is_loaded():
