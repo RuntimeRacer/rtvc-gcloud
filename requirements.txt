@@ -2,9 +2,9 @@
 # Function dependencies, for example:
 # package>=version
 
-# Webserver
+# Webserver & GCloud Frameworks
 flask
-requests
+#requests
 functions-framework==3.*
 google-cloud-storage
 google-cloud-logging
@@ -27,4 +27,4 @@ numba
 webrtcvad
 sox
 webvtt-py
-accelerate==0.4.0
+# accelerate==0.4.0
