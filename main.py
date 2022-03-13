@@ -45,10 +45,6 @@ if MODELS_BUCKET != "LOCAL":
 @app.route("/vocode")
 @app.route("/render")
 def handle_request(request: flask.Request):
-    # Response vars
-    response = {}
-    code = 200
-
     # Add CORS header to each response
     headers = {
         'Access-Control-Allow-Origin': '*'
@@ -59,20 +55,24 @@ def handle_request(request: flask.Request):
     request_data = request.get_json()
     if method != 'POST' or not request_data:
         response, code = get_version(request)
+        return flask.make_response(response, code, headers)
 
     # Get route and forward request
     if 'encode' in request.path:
         response, code = process_encode_request(request_data)
+        return flask.make_response(response, code, headers)
     if 'synthesize' in request.path:
         response, code = process_synthesize_request(request_data)
+        return flask.make_response(response, code, headers)
     if 'vocode' in request.path:
         response, code = process_vocode_request(request_data)
+        return flask.make_response(response, code, headers)
     if 'render' in request.path:
         response, code = process_render_request(request_data)
+        return flask.make_response(response, code, headers)
     else:
         response, code = get_version(request)
-
-    return flask.make_response(response, code, headers)
+        return flask.make_response(response, code, headers)
 
 # process_encode_request
 # Input params:
