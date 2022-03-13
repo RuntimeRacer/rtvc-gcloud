@@ -209,7 +209,7 @@ def process_synthesize_request(request_data):
         "synthesized_mel_graph": render.spectogram(full_spectogram)
     }
 
-    return flask.make_response(response)
+    return response, 200
 
 # process_vocode_request
 # Input params:
@@ -297,7 +297,7 @@ def process_vocode_request(request_data):
         "generated_wav": base64.b64encode(wav_string).decode('utf-8')
     }
 
-    return flask.make_response(response)
+    return response, 200
 
 # process_render_request -> Performs synthesize & vocode in a single step
 # Input params:
@@ -307,7 +307,7 @@ def process_vocode_request(request_data):
 # Returns:
 # - binary wav file of
 def process_render_request(request_data):
-    return {"success":"vocoder function triggered"}
+    return {"success":"vocoder function triggered"}, 200
 
 # get_version returns basic info on this gcloud function
 def get_version(request=None):
@@ -323,4 +323,4 @@ def get_version(request=None):
             "data": request.get_json(),
             "route": request.path
         }
-    return response
+    return response, 200
