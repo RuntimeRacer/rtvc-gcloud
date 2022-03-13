@@ -45,35 +45,34 @@ if MODELS_BUCKET != "LOCAL":
 @app.route("/vocode")
 @app.route("/render")
 def handle_request(request: flask.Request):
-    # Prepare response
-    response = None
+    # Response vars
+    response = {}
+    code = 200
+
+    # Add CORS header to each response
+    headers = {
+        'Access-Control-Allow-Origin': '*'
+    }
 
     # Parse request data anyways
     method = request.method
     request_data = request.get_json()
     if method != 'POST' or not request_data:
-        if request.args:
-            response = flask.make_response(get_version(request))
-        elif request_data:
-            response = flask.make_response(get_version(request))
-        else:
-            response = flask.make_response(get_version(request))
+        response, code = get_version(request)
 
     # Get route and forward request
     if 'encode' in request.path:
-        response = process_encode_request(request_data)
+        response, code = process_encode_request(request_data)
     if 'synthesize' in request.path:
-        response = process_synthesize_request(request_data)
+        response, code = process_synthesize_request(request_data)
     if 'vocode' in request.path:
-        response = process_vocode_request(request_data)
+        response, code = process_vocode_request(request_data)
     if 'render' in request.path:
-        response = process_render_request(request_data)
+        response, code = process_render_request(request_data)
     else:
-        response = flask.make_response(get_version(request))
+        response, code = get_version(request)
 
-    # add CORS rule
-    response.header['Access-Control-Allow-Origin'] = '*'
-    return response
+    return flask.make_response(response, code, headers)
 
 # process_encode_request
 # Input params:
@@ -87,7 +86,7 @@ def process_encode_request(request_data):
     wav = request_data["speaker_wav"] if "speaker_wav" in request_data else None
 
     if wav is None:
-        return error_response("no speaker wav provided")
+        return "no speaker wav provided", 400
 
     # Generate the spectogram - if this fails, audio data provided is invalid
     try:
@@ -97,7 +96,7 @@ def process_encode_request(request_data):
         spectogram = Synthesizer.make_spectrogram(wav)
     except Exception as e:
         logging.log(logging.ERROR, e)
-        return error_response("invalid speaker wav provided")
+        return "invalid speaker wav provided", 400
 
     # Load the model
     if not encoder.is_loaded():
@@ -114,7 +113,7 @@ def process_encode_request(request_data):
             encoder.load_model(pathlib.Path(ENCODER_MODEL_LOCAL_PATH))
             logging.log(logging.INFO, "Successfully loaded encoder (%dms)." % int(1000 * (timer() - start)))
         else:
-            return error_response("encoder model not found", 500)
+            return "encoder model not found", 500
 
     # process wav and generate embedding
     encoder_wav = encoder.preprocess_wav(wav)
@@ -127,7 +126,7 @@ def process_encode_request(request_data):
         "embed_mel_graph": render.spectogram(spectogram)
     }
 
-    return flask.make_response(response)
+    return response, 200
 
 # process_synthesize_request
 # Input params:
@@ -145,9 +144,9 @@ def process_synthesize_request(request_data):
 
     # Check input
     if embed is None:
-        return error_response("no speaker embedding provided")
+        return "no speaker embedding provided", 400
     if text is None or len(text) < 1:
-        return error_response("no text provided")
+        return "no text provided", 400
 
     # Decode input from base64
     try:
@@ -156,7 +155,7 @@ def process_synthesize_request(request_data):
         text = base64.decodebytes(text.encode('utf-8')).decode('utf-8')
     except Exception as e:
         logging.log(logging.ERROR, e)
-        return error_response("invalid embedding or text provided")
+        return "invalid embedding or text provided", 400
 
     # Apply seed
     if seed is None:
@@ -168,7 +167,7 @@ def process_synthesize_request(request_data):
             seed = manual_seed
         except Exception as e:
             logging.log(logging.ERROR, e)
-            return error_response("invalid generation seed provided")
+            return "invalid generation seed provided", 400
     logging.log(logging.INFO, "Using seed: %d" % seed)
 
     # Load the model FIXME: Make this static method as the other 2
@@ -185,7 +184,7 @@ def process_synthesize_request(request_data):
         synthesizer = Synthesizer(pathlib.Path(SYNTHESIZER_MODEL_LOCAL_PATH))
         logging.log(logging.INFO, "Successfully loaded synthesizer (%dms)." % int(1000 * (timer() - start)))
     else:
-        return error_response("synthesizer model not found", 500)
+        return "synthesizer model not found", 500
 
     # Process multiline text as individual synthesis => Maybe Possibility for threaded speedup here
     texts = text.split("\n")
@@ -225,13 +224,13 @@ def process_vocode_request(request_data):
 
     # Check input
     if synthesized is None:
-        return error_response("no synthesized data provided")
+        return "no synthesized data provided", 400
 
     # Get mel and breaks
     syn_mel = synthesized["mel"] if "mel" in synthesized else None
     syn_breaks = synthesized["breaks"] if "breaks" in synthesized else None
     if syn_mel is None or syn_breaks is None:
-        return error_response("invalid synthesis data provided")
+        return "invalid synthesis data provided", 400
 
     # Decode input from base64
     try:
@@ -242,7 +241,7 @@ def process_vocode_request(request_data):
         syn_mel = np.array(syn_mel, dtype=np.float32)
     except Exception as e:
         logging.log(logging.ERROR, e)
-        return error_response("invalid synthesis data provided")
+        return "invalid synthesis data provided", 400
 
     # Apply seed
     if seed is None:
@@ -254,7 +253,7 @@ def process_vocode_request(request_data):
             seed = manual_seed
         except Exception as e:
             logging.log(logging.ERROR, e)
-            return error_response("invalid generation seed provided")
+            return "invalid generation seed provided", 400
     logging.log(logging.INFO, "Using seed: %d" % seed)
 
     # Load the model
@@ -272,7 +271,7 @@ def process_vocode_request(request_data):
             vocoder.load_model(pathlib.Path(VOCODER_MODEL_LOCAL_PATH))
             logging.log(logging.INFO, "Successfully loaded vocoder (%dms)." % int(1000 * (timer() - start)))
         else:
-            return error_response("vocoder model not found", 500)
+            return "vocoder model not found", 500
 
     # Apply vocoder on mel
     wav = vocoder.infer_waveform(syn_mel)
@@ -324,9 +323,4 @@ def get_version(request=None):
             "data": request.get_json(),
             "route": request.path
         }
-    return response
-
-# creates a flask response
-def error_response(message, code=400):
-    response = flask.make_response(message, code)
     return response
