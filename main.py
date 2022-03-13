@@ -4,7 +4,6 @@ import pathlib
 
 import render
 import flask
-from flask_cors import CORS as cors
 import json
 import base64
 import logging
@@ -32,7 +31,6 @@ VOCODER_MODEL_LOCAL_PATH = os.environ['VOCODER_MODEL_LOCAL_PATH']
 
 # Cloud Function related stuff
 app = flask.Flask(__name__)
-cors(app)
 
 if MODELS_BUCKET != "LOCAL":
     log_client = g_log.Client()
@@ -47,28 +45,35 @@ if MODELS_BUCKET != "LOCAL":
 @app.route("/vocode")
 @app.route("/render")
 def handle_request(request: flask.Request):
+    # Prepare response
+    response = None
+
     # Parse request data anyways
     method = request.method
     request_data = request.get_json()
     if method != 'POST' or not request_data:
         if request.args:
-            return flask.make_response(get_version(request))
+            response = flask.make_response(get_version(request))
         elif request_data:
-            return flask.make_response(get_version(request))
+            response = flask.make_response(get_version(request))
         else:
-            return flask.make_response(get_version(request))
+            response = flask.make_response(get_version(request))
 
     # Get route and forward request
     if 'encode' in request.path:
-        return process_encode_request(request_data)
+        response = process_encode_request(request_data)
     if 'synthesize' in request.path:
-        return process_synthesize_request(request_data)
+        response = process_synthesize_request(request_data)
     if 'vocode' in request.path:
-        return process_vocode_request(request_data)
+        response = process_vocode_request(request_data)
     if 'render' in request.path:
-        return process_render_request(request_data)
+        response = process_render_request(request_data)
     else:
-        return flask.make_response(get_version(request))
+        response = flask.make_response(get_version(request))
+
+    # add CORS rule
+    response.header['Access-Control-Allow-Origin'] = '*'
+    return response
 
 # process_encode_request
 # Input params:
