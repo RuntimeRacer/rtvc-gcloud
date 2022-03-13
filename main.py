@@ -4,6 +4,7 @@ import pathlib
 
 import render
 import flask
+from flask_cors import CORS as cors
 import json
 import base64
 import logging
@@ -19,7 +20,6 @@ from google.cloud import logging as g_log
 from encoder import inference as encoder
 from synthesizer.inference import Synthesizer
 from vocoder import inference as vocoder
-from vocoder import audio as voc_audio
 
 # Env vars
 MODELS_BUCKET = os.environ['MODELS_BUCKET']
@@ -32,6 +32,8 @@ VOCODER_MODEL_LOCAL_PATH = os.environ['VOCODER_MODEL_LOCAL_PATH']
 
 # Cloud Function related stuff
 app = flask.Flask(__name__)
+cors(app)
+
 if MODELS_BUCKET != "LOCAL":
     log_client = g_log.Client()
     log_client.setup_logging(log_level=logging.INFO)

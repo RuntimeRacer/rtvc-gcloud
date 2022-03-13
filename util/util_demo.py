@@ -54,7 +54,7 @@ synthesized = syn_result["synthesized"]
 mel_graph = syn_result["synthesized_mel_graph"]
 
 # Save image of mel graph
-funcs.save_b64_image(mel_graph, input_file+".synthesized_mel_graph.png")
+funcs.save_b64_image(mel_graph, output_file+".synthesized_mel_graph.png")
 
 # Create request to vocode synthesized spectogram
 voc_result = funcs.send_vocode_request(SERVICE_URL, synthesized)
