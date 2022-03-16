@@ -30,7 +30,7 @@ RUN curl https://sdk.cloud.google.com | bash > /dev/null
 
 # Setup the Key and authentication
 RUN echo $STORAGE_KEY | base64 --decode > storage-key.json
-RUN gcloud auth activate-service-account $STORAGE_ACCOUNT --key-file=storage-key.json
+RUN /root/google-cloud-sdk/bin/gcloud auth activate-service-account $STORAGE_ACCOUNT --key-file=storage-key.json
 
 # Get models from gcloud and bundle them in container -> Reduces initial spawn time of the container
 RUN mkdir -p "models"
