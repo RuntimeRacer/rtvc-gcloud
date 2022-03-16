@@ -1,7 +1,7 @@
 steps:
   - name: 'gcr.io/cloud-builders/docker'
     entrypoint: 'bash'
-    args: [ '-c', '$_GCR_HOSTNAME/$PROJECT_ID/$REPO_NAME/$_SERVICE_NAME:latest || exit 0' ]
+    args: [ '-c', 'docker pull $_GCR_HOSTNAME/$PROJECT_ID/$REPO_NAME/$_SERVICE_NAME:latest || exit 0' ]
     id: Cache-Pull
   - name: gcr.io/cloud-builders/docker
     args:
