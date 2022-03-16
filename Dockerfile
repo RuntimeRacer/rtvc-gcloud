@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 
 # STAGE 2: model download
-FROM debian:jessie AS model-download
+FROM python:3.8 AS model-download
 
 # Get and install gcloud SDK to access storage
 RUN curl https://sdk.cloud.google.com | bash > /dev/null
