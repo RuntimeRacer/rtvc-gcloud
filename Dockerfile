@@ -56,6 +56,10 @@ ENV APP_HOME /app
 WORKDIR $APP_HOME
 COPY . ./
 
+# Copy over models
+RUN mkdir -p "models"
+COPY --from=compile-image /var/models models
+
 # Run the web service on container startup. Here we use the gunicorn
 # webserver, with one worker process and 8 threads.
 # For environments with multiple CPU cores, increase the number of workers
