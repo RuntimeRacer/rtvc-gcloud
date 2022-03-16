@@ -1,6 +1,6 @@
 # Use two stages, on for compile and one for runtime
 # STAGE 1: compile
-FROM python:3.8.12-slim-bullseye AS compile-image
+FROM python:3.8.12-slim AS compile-image
 
 # Allow statements and log messages to immediately appear in the Knative logs
 ENV PYTHONUNBUFFERED True
@@ -31,10 +31,10 @@ RUN gcloud auth activate-service-account $STORAGE_ACCOUNT --key-file=storage-key
 
 # Get models from gcloud and bundle them in container -> Reduces initial spawn time of the container
 RUN mkdir -p /var/models
-RUN gsutil -m cp -r gs://$MODELS_BUCKET /var/models
+RUN gsutil -m cp gs://$MODELS_BUCKET/* /var/models
 
 # Stage 2: build for runtime
-FROM python:3.8.12-slim-bullseye AS build-image
+FROM python:3.8.12-slim AS build-image
 
 # Allow statements and log messages to immediately appear in the Knative logs
 ENV PYTHONUNBUFFERED True
