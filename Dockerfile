@@ -6,9 +6,6 @@ FROM python:3.8 AS compile-image
 # Allow statements and log messages to immediately appear in the Knative logs
 ENV PYTHONUNBUFFERED True
 
-# Small test to check build args are working
-RUN echo $MODELS_BUCKET
-
 # Install build dependencies.
 RUN apt-get update -y && apt-get install -y --no-install-recommends build-essential gcc
 
