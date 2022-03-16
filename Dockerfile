@@ -33,7 +33,7 @@ ARG SYNTHESIZER_MODEL_BUCKET_PATH
 ARG VOCODER_MODEL_BUCKET_PATH
 
 # Setup the Key and authentication
-RUN echo $STORAGE_KEY | base64 --decode > storage-key.json
+RUN echo $STORAGE_KEY | base64 -d > storage-key.json
 RUN gcloud auth activate-service-account $STORAGE_ACCOUNT --key-file=storage-key.json
 
 # Get models from gcloud and bundle them in container -> Reduces initial spawn time of the container
