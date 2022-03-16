@@ -1,5 +1,4 @@
-# Use multiple stages, one for compile, one for model downlod, one for runtime
-
+# Use two stages, on for compile and one for runtime
 # STAGE 1: compile
 FROM python:3.8 AS compile-image
 
@@ -17,15 +16,11 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-
-# STAGE 2: model download
-FROM python:3.8 AS model-download
-
 # Get and install gcloud SDK to access storage
 RUN curl https://sdk.cloud.google.com | bash > /dev/null
 ENV PATH="${PATH}:/root/google-cloud-sdk/bin"
 
-# Get Args for downloading the models
+# Get Args for model download
 ARG STORAGE_KEY
 ARG STORAGE_ACCOUNT
 ARG MODELS_BUCKET
@@ -34,7 +29,7 @@ ARG SYNTHESIZER_MODEL_BUCKET_PATH
 ARG VOCODER_MODEL_BUCKET_PATH
 
 # Setup the Key and authentication
-RUN echo $STORAGE_KEY | base64 -d > storage-key.json
+RUN echo $STORAGE_KEY | base64 --decode > storage-key.json
 RUN gcloud auth activate-service-account $STORAGE_ACCOUNT --key-file=storage-key.json
 
 # Get models from gcloud and bundle them in container -> Reduces initial spawn time of the container
@@ -43,7 +38,7 @@ RUN gsutil cp gs://$MODELS_BUCKET/$ENCODER_MODEL_BUCKET_PATH "/var/models/encode
 RUN gsutil cp gs://$MODELS_BUCKET/$SYNTHESIZER_MODEL_BUCKET_PATH "/var/models/synthesizer.pt"
 RUN gsutil cp gs://$MODELS_BUCKET/$VOCODER_MODEL_BUCKET_PATH "/var/models/vocoder.pt"
 
-# Stage 3: build for runtime
+# Stage 2: build for runtime
 FROM python:3.8 AS build-image
 
 # Allow statements and log messages to immediately appear in the Knative logs
@@ -63,7 +58,7 @@ COPY . ./
 
 # Copy over models
 RUN mkdir -p "models"
-COPY --from=model-download /var/models models
+COPY --from=compile-image /var/models models
 
 # Run the web service on container startup. Here we use the gunicorn
 # webserver, with one worker process and 8 threads.
