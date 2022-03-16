@@ -40,7 +40,6 @@ RUN gsutil cp gs://$MODELS_BUCKET/$SYNTHESIZER_MODEL_BUCKET_PATH "models/synthes
 RUN gsutil cp gs://$MODELS_BUCKET/$VOCODER_MODEL_BUCKET_PATH "models/vocoder.pt"
 
 # Cleanup; shrink the image
-ENV PATH="${PATH%:/root/google-cloud-sdk/bin}"
 RUN rm storage-key.json && rm -rf /root/google-cloud-sdk/ && apt-get autoremove
 
 # Run the web service on container startup. Here we use the gunicorn
