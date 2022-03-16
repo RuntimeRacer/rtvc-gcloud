@@ -38,6 +38,7 @@ ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
 
 # Get models from gcloud and bundle them in container -> Reduces init time
 #RUN gcloud auth login
+RUN echo "gs://$MODELS_BUCKET/$ENCODER_MODEL_BUCKET_PATH $ENCODER_MODEL_LOCAL_PATH"
 RUN gsutil cp gs://$MODELS_BUCKET/$ENCODER_MODEL_BUCKET_PATH $ENCODER_MODEL_LOCAL_PATH
 RUN gsutil cp gs://$MODELS_BUCKET/$SYNTHESIZER_MODEL_BUCKET_PATH $SYNTHESIZER_MODEL_LOCAL_PATH
 RUN gsutil cp gs://$MODELS_BUCKET/$VOCODER_MODEL_BUCKET_PATH $VOCODER_MODEL_LOCAL_PATH
