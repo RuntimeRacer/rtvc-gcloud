@@ -1,6 +1,6 @@
 # Use two stages, on for compile and one for runtime
 # STAGE 1: compile
-FROM python:3.8.12-slim AS compile-image
+FROM python:3.8.12-slim-bullseye AS compile-image
 
 # Allow statements and log messages to immediately appear in the Knative logs
 ENV PYTHONUNBUFFERED True
@@ -34,7 +34,7 @@ RUN mkdir -p /var/models
 RUN gsutil -m cp gs://$MODELS_BUCKET/* /var/models
 
 # Stage 2: build for runtime
-FROM python:3.8.12-slim AS build-image
+FROM python:3.8.12-slim-bullseye AS build-image
 
 # Allow statements and log messages to immediately appear in the Knative logs
 ENV PYTHONUNBUFFERED True
