@@ -5,14 +5,6 @@ FROM python:3.8 AS compile-image
 # Allow statements and log messages to immediately appear in the Knative logs
 ENV PYTHONUNBUFFERED True
 
-# Get Args for build job
-ARG STORAGE_KEY
-ARG STORAGE_ACCOUNT
-ARG MODELS_BUCKET
-ARG ENCODER_MODEL_BUCKET_PATH
-ARG SYNTHESIZER_MODEL_BUCKET_PATH
-ARG VOCODER_MODEL_BUCKET_PATH
-
 # Small test to check build args are working
 RUN echo $MODELS_BUCKET
 
@@ -30,6 +22,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Get and install gcloud SDK to access storage
 RUN curl https://sdk.cloud.google.com | bash > /dev/null
 ENV PATH="${PATH}:/root/google-cloud-sdk/bin"
+
+# Get Args for downloading the models
+ARG STORAGE_KEY
+ARG STORAGE_ACCOUNT
+ARG MODELS_BUCKET
+ARG ENCODER_MODEL_BUCKET_PATH
+ARG SYNTHESIZER_MODEL_BUCKET_PATH
+ARG VOCODER_MODEL_BUCKET_PATH
 
 # Setup the Key and authentication
 RUN echo $STORAGE_KEY | base64 --decode > storage-key.json
