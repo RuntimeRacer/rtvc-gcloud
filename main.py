@@ -1,7 +1,7 @@
 import io
 import os
 import pathlib
-
+import const
 import render
 import flask
 import json
@@ -12,29 +12,14 @@ import numpy as np
 import soundfile as sf
 
 from time import perf_counter as timer
-from google.cloud import storage
-from google.cloud import logging as g_log
 
 # SV2TTS
 from encoder import inference as encoder
 from synthesizer.inference import Synthesizer
 from vocoder import inference as vocoder
 
-# Env vars
-MODELS_BUCKET = os.environ['MODELS_BUCKET']
-ENCODER_MODEL_BUCKET_PATH = os.environ['ENCODER_MODEL_BUCKET_PATH']
-ENCODER_MODEL_LOCAL_PATH = os.environ['ENCODER_MODEL_LOCAL_PATH']
-SYNTHESIZER_MODEL_BUCKET_PATH = os.environ['SYNTHESIZER_MODEL_BUCKET_PATH']
-SYNTHESIZER_MODEL_LOCAL_PATH = os.environ['SYNTHESIZER_MODEL_LOCAL_PATH']
-VOCODER_MODEL_BUCKET_PATH = os.environ['VOCODER_MODEL_BUCKET_PATH']
-VOCODER_MODEL_LOCAL_PATH = os.environ['VOCODER_MODEL_LOCAL_PATH']
-
 # Cloud Function related stuff
 app = flask.Flask(__name__)
-
-if MODELS_BUCKET != "LOCAL":
-    log_client = g_log.Client()
-    log_client.setup_logging(log_level=logging.INFO)
 
 # entry point of this gcloud function
 # Expects requests to be sent via POST method.
@@ -109,17 +94,10 @@ def process_encode_request(request_data):
 
     # Load the model
     if not encoder.is_loaded():
-        # Download speaker encoder model from storage bucket
-        if MODELS_BUCKET != "LOCAL" and not os.path.exists(ENCODER_MODEL_LOCAL_PATH):
-            storage_client = storage.Client()
-            bucket = storage_client.get_bucket(MODELS_BUCKET)
-            model = bucket.blob(ENCODER_MODEL_BUCKET_PATH)
-            model.download_to_filename(ENCODER_MODEL_LOCAL_PATH)
-
         # Load Speaker encoder
-        if os.path.exists(ENCODER_MODEL_LOCAL_PATH):
+        if os.path.exists(const.ENCODER_PATH):
             start = timer()
-            encoder.load_model(pathlib.Path(ENCODER_MODEL_LOCAL_PATH))
+            encoder.load_model(pathlib.Path(const.ENCODER_PATH))
             logging.log(logging.INFO, "Successfully loaded encoder (%dms)." % int(1000 * (timer() - start)))
         else:
             return "encoder model not found", 500
@@ -180,17 +158,10 @@ def process_synthesize_request(request_data):
     logging.log(logging.INFO, "Using seed: %d" % seed)
 
     # Load the model FIXME: Make this static method as the other 2
-    # Download synthesizer model from storage bucket
-    if MODELS_BUCKET != "LOCAL" and not os.path.exists(SYNTHESIZER_MODEL_LOCAL_PATH):
-        storage_client = storage.Client()
-        bucket = storage_client.get_bucket(MODELS_BUCKET)
-        model = bucket.blob(SYNTHESIZER_MODEL_BUCKET_PATH)
-        model.download_to_filename(SYNTHESIZER_MODEL_LOCAL_PATH)
-
     # Load synthesizer
-    if os.path.exists(SYNTHESIZER_MODEL_LOCAL_PATH):
+    if os.path.exists(const.SYNTHESIZER_PATH):
         start = timer()
-        synthesizer = Synthesizer(pathlib.Path(SYNTHESIZER_MODEL_LOCAL_PATH))
+        synthesizer = Synthesizer(pathlib.Path(const.SYNTHESIZER_PATH))
         logging.log(logging.INFO, "Successfully loaded synthesizer (%dms)." % int(1000 * (timer() - start)))
     else:
         return "synthesizer model not found", 500
@@ -267,17 +238,10 @@ def process_vocode_request(request_data):
 
     # Load the model
     if not vocoder.is_loaded():
-        # Download vocoder model from storage bucket
-        if MODELS_BUCKET != "LOCAL" and not os.path.exists(VOCODER_MODEL_LOCAL_PATH):
-            storage_client = storage.Client()
-            bucket = storage_client.get_bucket(MODELS_BUCKET)
-            model = bucket.blob(VOCODER_MODEL_BUCKET_PATH)
-            model.download_to_filename(VOCODER_MODEL_LOCAL_PATH)
-
         # Load vocoder
-        if os.path.exists(VOCODER_MODEL_LOCAL_PATH):
+        if os.path.exists(const.VOCODER_PATH):
             start = timer()
-            vocoder.load_model(pathlib.Path(VOCODER_MODEL_LOCAL_PATH))
+            vocoder.load_model(pathlib.Path(const.VOCODER_PATH))
             logging.log(logging.INFO, "Successfully loaded vocoder (%dms)." % int(1000 * (timer() - start)))
         else:
             return "vocoder model not found", 500

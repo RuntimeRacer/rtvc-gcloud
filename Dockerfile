@@ -9,11 +9,8 @@ ENV PYTHONUNBUFFERED True
 ARG STORAGE_KEY
 ARG STORAGE_ACCOUNT
 ARG MODELS_BUCKET
-ARG ENCODER_MODEL_LOCAL_PATH
 ARG ENCODER_MODEL_BUCKET_PATH
-ARG SYNTHESIZER_MODEL_LOCAL_PATH
 ARG SYNTHESIZER_MODEL_BUCKET_PATH
-ARG VOCODER_MODEL_LOCAL_PATH
 ARG VOCODER_MODEL_BUCKET_PATH
 
 # Small test to check build args are working
@@ -30,17 +27,19 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Get and install gcloud SDK to access storage
 RUN curl https://sdk.cloud.google.com | bash > /dev/null
-ENV PATH="${PATH}:/root/google-cloud-sdk/bin"
 
 # Setup the Key and authentication
 RUN echo $STORAGE_KEY | base64 --decode > storage-key.json
 RUN gcloud auth activate-service-account $STORAGE_ACCOUNT --key-file=storage-key.json
 
-# Get models from gcloud and bundle them in container -> Reduces init time
-#RUN gcloud auth login
-RUN gsutil cp gs://$MODELS_BUCKET/$ENCODER_MODEL_BUCKET_PATH $ENCODER_MODEL_LOCAL_PATH
-RUN gsutil cp gs://$MODELS_BUCKET/$SYNTHESIZER_MODEL_BUCKET_PATH $SYNTHESIZER_MODEL_LOCAL_PATH
-RUN gsutil cp gs://$MODELS_BUCKET/$VOCODER_MODEL_BUCKET_PATH $VOCODER_MODEL_LOCAL_PATH
+# Get models from gcloud and bundle them in container -> Reduces initial spawn time of the container
+RUN mkdir -p "models"
+RUN /root/google-cloud-sdk/bin/gsutil cp gs://$MODELS_BUCKET/$ENCODER_MODEL_BUCKET_PATH "models/encoder.pt"
+RUN /root/google-cloud-sdk/bin/gsutil cp gs://$MODELS_BUCKET/$SYNTHESIZER_MODEL_BUCKET_PATH "models/synthesizer.pt"
+RUN /root/google-cloud-sdk/bin/gsutil cp gs://$MODELS_BUCKET/$VOCODER_MODEL_BUCKET_PATH "models/vocoder.pt"
+
+# Cleanup; shrink the image
+RUN rm storage-key.json && rm -rf /root/google-cloud-sdk/ && apt-get autoremove
 
 # Run the web service on container startup. Here we use the gunicorn
 # webserver, with one worker process and 8 threads.
