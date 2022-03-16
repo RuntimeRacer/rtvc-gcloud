@@ -1,4 +1,5 @@
-# Use two stages, on for compile and one for runtime
+# Use multiple stages, one for compile, one for model downlod, one for runtime
+
 # STAGE 1: compile
 FROM python:3.8 AS compile-image
 
@@ -19,9 +20,9 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Get and install gcloud SDK to access storage
-RUN curl https://sdk.cloud.google.com | bash > /dev/null
-ENV PATH="${PATH}:/root/google-cloud-sdk/bin"
+
+# STAGE 2: model download
+FROM google/cloud-sdk:alpine AS model-download
 
 # Get Args for downloading the models
 ARG STORAGE_KEY
@@ -41,7 +42,7 @@ RUN gsutil cp gs://$MODELS_BUCKET/$ENCODER_MODEL_BUCKET_PATH "/var/models/encode
 RUN gsutil cp gs://$MODELS_BUCKET/$SYNTHESIZER_MODEL_BUCKET_PATH "/var/models/synthesizer.pt"
 RUN gsutil cp gs://$MODELS_BUCKET/$VOCODER_MODEL_BUCKET_PATH "/var/models/vocoder.pt"
 
-# Stage 2: build for runtime
+# Stage 3: build for runtime
 FROM python:3.8 AS build-image
 
 # Allow statements and log messages to immediately appear in the Knative logs
@@ -61,7 +62,7 @@ COPY . ./
 
 # Copy over models
 RUN mkdir -p "models"
-COPY --from=compile-image /var/models models
+COPY --from=model-download /var/models models
 
 # Run the web service on container startup. Here we use the gunicorn
 # webserver, with one worker process and 8 threads.
