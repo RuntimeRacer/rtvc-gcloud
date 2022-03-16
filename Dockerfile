@@ -6,7 +6,7 @@ FROM python:3.8.12-slim-bullseye AS compile-image
 ENV PYTHONUNBUFFERED True
 
 # Install build dependencies.
-RUN apt-get update -y && apt-get install -y --no-install-recommends build-essential gcc
+RUN apt-get update -y && apt-get install -y --no-install-recommends build-essential gcc curl
 
 # Setup venv for building all requirements and add it to path
 RUN python -m venv /opt/venv
