@@ -34,9 +34,9 @@ RUN gcloud auth activate-service-account $STORAGE_ACCOUNT --key-file=storage-key
 
 # Get models from gcloud and bundle them in container -> Reduces initial spawn time of the container
 RUN mkdir -p "/var/models"
-RUN gsutil cp gs://$MODELS_BUCKET/$ENCODER_MODEL_BUCKET_PATH "/var/models/encoder.pt"
-RUN gsutil cp gs://$MODELS_BUCKET/$SYNTHESIZER_MODEL_BUCKET_PATH "/var/models/synthesizer.pt"
-RUN gsutil cp gs://$MODELS_BUCKET/$VOCODER_MODEL_BUCKET_PATH "/var/models/vocoder.pt"
+RUN gsutil -m cp gs://$MODELS_BUCKET/$ENCODER_MODEL_BUCKET_PATH "/var/models/encoder.pt"
+RUN gsutil -m cp gs://$MODELS_BUCKET/$SYNTHESIZER_MODEL_BUCKET_PATH "/var/models/synthesizer.pt"
+RUN gsutil -m cp gs://$MODELS_BUCKET/$VOCODER_MODEL_BUCKET_PATH "/var/models/vocoder.pt"
 
 # Stage 2: build for runtime
 FROM python:3.8 AS build-image
