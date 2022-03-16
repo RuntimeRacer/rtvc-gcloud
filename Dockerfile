@@ -17,7 +17,7 @@ ARG VOCODER_MODEL_BUCKET_PATH
 RUN echo $MODELS_BUCKET
 
 # Install build dependencies.
-RUN apt-get update -y && apt-get install -y --no-install-recommends build-essential gcc libsndfile1
+RUN apt-get update -y && apt-get install -y --no-install-recommends build-essential gcc
 
 # Setup venv for building all requirements and add it to path
 RUN python -m venv /opt/venv
@@ -46,6 +46,9 @@ FROM python:3.8 AS build-image
 
 # Allow statements and log messages to immediately appear in the Knative logs
 ENV PYTHONUNBUFFERED True
+
+# Install system dependencies.
+RUN apt-get update && apt-get install -y --no-install-recommends libsndfile1
 
 # Copy over venv and enable it
 COPY --from=compile-image /opt/venv /opt/venv
