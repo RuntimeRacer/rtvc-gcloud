@@ -5,7 +5,9 @@ FROM python:3.8
 # Allow statements and log messages to immediately appear in the Knative logs
 ENV PYTHONUNBUFFERED True
 
-# Get Args as ENVs
+# Get Args for build job
+ARG STORAGE_KEY
+ARG STORAGE_ACCOUNT
 ARG MODELS_BUCKET
 ARG ENCODER_MODEL_LOCAL_PATH
 ARG ENCODER_MODEL_BUCKET_PATH
@@ -14,13 +16,8 @@ ARG SYNTHESIZER_MODEL_BUCKET_PATH
 ARG VOCODER_MODEL_LOCAL_PATH
 ARG VOCODER_MODEL_BUCKET_PATH
 
-ENV MODELS_BUCKET=${MODELS_BUCKET}
-ENV ENCODER_MODEL_LOCAL_PATH=${ENCODER_MODEL_LOCAL_PATH}
-ENV ENCODER_MODEL_BUCKET_PATH=${ENCODER_MODEL_BUCKET_PATH}
-ENV SYNTHESIZER_MODEL_LOCAL_PATH=${SYNTHESIZER_MODEL_LOCAL_PATH}
-ENV SYNTHESIZER_MODEL_BUCKET_PATH=${SYNTHESIZER_MODEL_BUCKET_PATH}
-ENV VOCODER_MODEL_LOCAL_PATH=${VOCODER_MODEL_LOCAL_PATH}
-ENV VOCODER_MODEL_BUCKET_PATH=${VOCODER_MODEL_BUCKET_PATH}
+# Small test to check build args are working
+RUN echo $MODELS_BUCKET
 
 # Copy local code to the container image.
 ENV APP_HOME /app
@@ -32,16 +29,18 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends build-essent
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Get and install gcloud SDK to access storage
-RUN curl https://dl.google.com/dl/cloudsdk/release/google-cloud-sdk.tar.gz > /tmp/google-cloud-sdk.tar.gz
-RUN mkdir -p /usr/local/gcloud && tar -C /usr/local/gcloud -xvf /tmp/google-cloud-sdk.tar.gz && /usr/local/gcloud/google-cloud-sdk/install.sh
-ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
+RUN curl https://sdk.cloud.google.com | bash > /dev/null
+ENV PATH="${PATH}:/root/google-cloud-sdk/bin"
+
+# Setup the Key and authentication
+RUN echo $STORAGE_KEY | base64 > storage-key.json
+RUN gcloud auth activate-service-account $STORAGE_ACCOUNT --key-file=storage-key.json
 
 # Get models from gcloud and bundle them in container -> Reduces init time
 #RUN gcloud auth login
-RUN echo "gs://${MODELS_BUCKET}/${ENCODER_MODEL_BUCKET_PATH} ${ENCODER_MODEL_LOCAL_PATH}"
-RUN gsutil cp gs://${MODELS_BUCKET}/${ENCODER_MODEL_BUCKET_PATH} ${ENCODER_MODEL_LOCAL_PATH}
-RUN gsutil cp gs://${MODELS_BUCKET}/${SYNTHESIZER_MODEL_BUCKET_PATH} ${SYNTHESIZER_MODEL_LOCAL_PATH}
-RUN gsutil cp gs://${MODELS_BUCKET}/${VOCODER_MODEL_BUCKET_PATH} ${VOCODER_MODEL_LOCAL_PATH}
+RUN gsutil cp gs://$MODELS_BUCKET/$ENCODER_MODEL_BUCKET_PATH $ENCODER_MODEL_LOCAL_PATH
+RUN gsutil cp gs://$MODELS_BUCKET/$SYNTHESIZER_MODEL_BUCKET_PATH $SYNTHESIZER_MODEL_LOCAL_PATH
+RUN gsutil cp gs://$MODELS_BUCKET/$VOCODER_MODEL_BUCKET_PATH $VOCODER_MODEL_LOCAL_PATH
 
 # Run the web service on container startup. Here we use the gunicorn
 # webserver, with one worker process and 8 threads.
