@@ -1,6 +1,6 @@
-# Use the official lightweight Python image.
-# https://hub.docker.com/_/python
-FROM python:3.8
+# Use two stages, on for compile and one for runtime
+# STAGE 1: compile
+FROM python:3.8 AS compile-image
 
 # Allow statements and log messages to immediately appear in the Knative logs
 ENV PYTHONUNBUFFERED True
@@ -16,13 +16,15 @@ ARG VOCODER_MODEL_BUCKET_PATH
 # Small test to check build args are working
 RUN echo $MODELS_BUCKET
 
-# Copy local code to the container image.
-ENV APP_HOME /app
-WORKDIR $APP_HOME
-COPY . ./
-
-# Install production dependencies.
+# Install build dependencies.
 RUN apt-get update -y && apt-get install -y --no-install-recommends build-essential gcc libsndfile1
+
+# Setup venv for building all requirements and add it to path
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install requirements
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Get and install gcloud SDK to access storage
@@ -34,13 +36,25 @@ RUN echo $STORAGE_KEY | base64 --decode > storage-key.json
 RUN gcloud auth activate-service-account $STORAGE_ACCOUNT --key-file=storage-key.json
 
 # Get models from gcloud and bundle them in container -> Reduces initial spawn time of the container
-RUN mkdir -p "models"
-RUN gsutil cp gs://$MODELS_BUCKET/$ENCODER_MODEL_BUCKET_PATH "models/encoder.pt"
-RUN gsutil cp gs://$MODELS_BUCKET/$SYNTHESIZER_MODEL_BUCKET_PATH "models/synthesizer.pt"
-RUN gsutil cp gs://$MODELS_BUCKET/$VOCODER_MODEL_BUCKET_PATH "models/vocoder.pt"
+RUN mkdir -p "/var/models"
+RUN gsutil cp gs://$MODELS_BUCKET/$ENCODER_MODEL_BUCKET_PATH "/var/models/encoder.pt"
+RUN gsutil cp gs://$MODELS_BUCKET/$SYNTHESIZER_MODEL_BUCKET_PATH "/var/models/synthesizer.pt"
+RUN gsutil cp gs://$MODELS_BUCKET/$VOCODER_MODEL_BUCKET_PATH "/var/models/vocoder.pt"
 
-# Cleanup; shrink the image
-RUN rm storage-key.json && rm -rf /root/google-cloud-sdk/ && apt-get autoremove
+# Stage 2: build for runtime
+FROM python:3.8 AS build-image
+
+# Allow statements and log messages to immediately appear in the Knative logs
+ENV PYTHONUNBUFFERED True
+
+# Copy over venv and enable it
+COPY --from=compile-image /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy local code to the container image.
+ENV APP_HOME /app
+WORKDIR $APP_HOME
+COPY . ./
 
 # Run the web service on container startup. Here we use the gunicorn
 # webserver, with one worker process and 8 threads.
