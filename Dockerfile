@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 
 # STAGE 2: model download
-FROM google/cloud-sdk:slim AS model-download
+FROM google/cloud-sdk:alpine AS model-download
 
 # Get Args for downloading the models
 ARG STORAGE_KEY
@@ -33,8 +33,9 @@ ARG SYNTHESIZER_MODEL_BUCKET_PATH
 ARG VOCODER_MODEL_BUCKET_PATH
 
 # Setup the Key and authentication
-RUN echo $STORAGE_KEY | base64 --decode > storage-key.json
+RUN echo $STORAGE_KEY | base64 -d > storage-key.json
 RUN gcloud auth activate-service-account $STORAGE_ACCOUNT --key-file=storage-key.json
+RUN gcloud auth login
 
 # Get models from gcloud and bundle them in container -> Reduces initial spawn time of the container
 RUN mkdir -p "/var/models"
