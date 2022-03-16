@@ -7,9 +7,6 @@ steps:
       - '--build-arg=STORAGE_KEY=${_STORAGE_KEY}'
       - '--build-arg=STORAGE_ACCOUNT=${_STORAGE_ACCOUNT}'
       - '--build-arg=MODELS_BUCKET=${_MODELS_BUCKET}'
-      - '--build-arg=ENCODER_MODEL_BUCKET_PATH=${_ENCODER_MODEL_BUCKET_PATH}'
-      - '--build-arg=SYNTHESIZER_MODEL_BUCKET_PATH=${_SYNTHESIZER_MODEL_BUCKET_PATH}'
-      - '--build-arg=VOCODER_MODEL_BUCKET_PATH=${_VOCODER_MODEL_BUCKET_PATH}'
       - .
       - '-f'
       - Dockerfile

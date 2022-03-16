@@ -24,9 +24,6 @@ ENV PATH="${PATH}:/root/google-cloud-sdk/bin"
 ARG STORAGE_KEY
 ARG STORAGE_ACCOUNT
 ARG MODELS_BUCKET
-ARG ENCODER_MODEL_BUCKET_PATH
-ARG SYNTHESIZER_MODEL_BUCKET_PATH
-ARG VOCODER_MODEL_BUCKET_PATH
 
 # Setup the Key and authentication
 RUN echo $STORAGE_KEY | base64 --decode > storage-key.json
