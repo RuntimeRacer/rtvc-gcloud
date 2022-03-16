@@ -20,10 +20,10 @@ RUN mkdir -p /usr/local/gcloud && tar -C /usr/local/gcloud -xvf /tmp/google-clou
 ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
 
 # Get models from gcloud and bundle them in container -> Reduces init time
-gcloud auth login
-gsutil cp gs://$MODELS_BUCKET/$ENCODER_MODEL_BUCKET_PATH $ENCODER_MODEL_LOCAL_PATH
-gsutil cp gs://$MODELS_BUCKET/$SYNTHESIZER_MODEL_BUCKET_PATH $SYNTHESIZER_MODEL_LOCAL_PATH
-gsutil cp gs://$MODELS_BUCKET/$VOCODER_MODEL_BUCKET_PATH $VOCODER_MODEL_LOCAL_PATH
+RUN gcloud auth login
+RUN gsutil cp gs://$MODELS_BUCKET/$ENCODER_MODEL_BUCKET_PATH $ENCODER_MODEL_LOCAL_PATH
+RUN gsutil cp gs://$MODELS_BUCKET/$SYNTHESIZER_MODEL_BUCKET_PATH $SYNTHESIZER_MODEL_LOCAL_PATH
+RUN gsutil cp gs://$MODELS_BUCKET/$VOCODER_MODEL_BUCKET_PATH $VOCODER_MODEL_LOCAL_PATH
 
 # Run the web service on container startup. Here we use the gunicorn
 # webserver, with one worker process and 8 threads.
