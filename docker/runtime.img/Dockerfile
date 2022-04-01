@@ -13,7 +13,7 @@ COPY . ./
 
 # Copy over models
 RUN mkdir -p "models"
-COPY --from=compile-image /var/models models
+RUN mv /var/models/* models
 
 # Run the web service on container startup. Here we use the gunicorn
 # webserver, with one worker process and 8 threads.
