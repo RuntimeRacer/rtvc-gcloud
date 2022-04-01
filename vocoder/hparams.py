@@ -15,7 +15,7 @@ mel_max_abs_value = _syn_hp.max_abs_value
 preemphasis = _syn_hp.preemphasis
 apply_preemphasis = _syn_hp.preemphasize
 
-bits = 10                            # bit depth of signal
+bits = 9                            # bit depth of signal
 mu_law = True                       # Recommended to suppress noise if using raw bits in hp.voc_mode
                                     # below
 
