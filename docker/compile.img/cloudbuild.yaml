@@ -1,0 +1,26 @@
+# Compile Image build script for RTVC-GCloud
+# Execution from repo root
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - '-t'
+      - '$_GCR_HOSTNAME/$PROJECT_ID/$REPO_NAME/$_SERVICE_NAME-compile:latest'
+      - '--build-arg=STORAGE_KEY=${_STORAGE_KEY}'
+      - '--build-arg=STORAGE_ACCOUNT=${_STORAGE_ACCOUNT}'
+      - '--build-arg=MODELS_BUCKET=${_MODELS_BUCKET}'
+      - .
+      - '-f'
+      - docker/compile.img/Dockerfile
+    id: Build
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - '$_GCR_HOSTNAME/$PROJECT_ID/$REPO_NAME/$_SERVICE_NAME-compile:latest'
+    id: Push
+images:
+  - '$_GCR_HOSTNAME/$PROJECT_ID/$REPO_NAME/$_SERVICE_NAME-compile:latest'
+options:
+  substitutionOption: ALLOW_LOOSE
+tags:
+  - kajispeech
