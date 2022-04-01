@@ -4,6 +4,7 @@ import pathlib
 import const
 import render
 import flask
+from flask_cors import CORS
 import json
 import base64
 import logging
@@ -20,56 +21,43 @@ from vocoder import inference as vocoder
 
 # Cloud Function related stuff
 app = flask.Flask(__name__)
+CORS(app)
 
 # entry point of this gcloud function
 # Expects requests to be sent via POST method.
 # In case of a non-POST Request it will respond with get_version().
-@app.route("/")
-@app.route("/encode")
-@app.route("/synthesize")
-@app.route("/vocode")
-@app.route("/render")
-def handle_request(request: flask.Request):
-    # Add CORS header to each response
-    headers = {
-        'Access-Control-Allow-Origin': '*'
-    }
-
+@app.route("/", methods=['GET', 'POST'])
+@app.route("/encode", methods=['GET', 'POST'])
+@app.route("/synthesize", methods=['GET', 'POST'])
+@app.route("/vocode", methods=['GET', 'POST'])
+@app.route("/render", methods=['GET', 'POST'])
+def handle_request():
     # Parse request data
+    request = flask.request
     method = request.method
     request_data = request.get_json()
-
-    # CORS handling
-    if method == 'OPTIONS':
-        headers = {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST',
-            'Access-Control-Allow-Headers': 'Content-Type',
-            'Access-Control-Max-Age': '3600'
-        }
-        return flask.make_response('', 204, headers)
 
     # Default route for non-post or bad request
     if method != 'POST' or not request_data:
         response, code = get_version(request)
-        return flask.make_response(response, code, headers)
+        return flask.make_response(response, code)
 
     # Get route and forward request
     if 'encode' in request.path:
         response, code = process_encode_request(request_data)
-        return flask.make_response(response, code, headers)
+        return flask.make_response(response, code)
     if 'synthesize' in request.path:
         response, code = process_synthesize_request(request_data)
-        return flask.make_response(response, code, headers)
+        return flask.make_response(response, code)
     if 'vocode' in request.path:
         response, code = process_vocode_request(request_data)
-        return flask.make_response(response, code, headers)
+        return flask.make_response(response, code)
     if 'render' in request.path:
         response, code = process_render_request(request_data)
-        return flask.make_response(response, code, headers)
+        return flask.make_response(response, code)
     else:
         response, code = get_version(request)
-        return flask.make_response(response, code, headers)
+        return flask.make_response(response, code)
 
 # process_encode_request
 # Input params:
@@ -300,3 +288,6 @@ def get_version(request=None):
             "route": request.path
         }
     return response, 200
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))

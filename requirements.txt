@@ -4,6 +4,8 @@
 
 # Webserver & GCloud Frameworks
 flask
+flask_cors
+gunicorn
 #requests
 functions-framework==3.*
 google-cloud-storage
