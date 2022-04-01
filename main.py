@@ -32,7 +32,10 @@ app = flask.Flask(__name__)
 def handle_request(request: flask.Request):
     # Add CORS header to each response
     headers = {
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Max-Age': '3600'
     }
 
     # Parse request data anyways
@@ -40,12 +43,6 @@ def handle_request(request: flask.Request):
     request_data = request.get_json()
     if method != 'POST' or not request_data:
         if method == 'OPTIONS':
-            headers = {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'POST',
-                'Access-Control-Allow-Headers': 'content-type',
-                'Access-Control-Max-Age': '3600'
-            }
             return flask.make_response('', 204, headers)
 
         response, code = get_version(request)
