@@ -59,5 +59,5 @@ voc_tts_schedule=[
 
 # Generating / Synthesizing
 voc_gen_batched = True              # very fast (realtime+) single utterance batched generation
-voc_target = 16000                  # target number of samples to be generated in each batch entry
-voc_overlap = 800                   # number of samples for crossfading between batches
+voc_target = 3000                   # target number of samples to be generated in each batch entry
+voc_overlap = 1500                  # number of samples for crossfading between batches
