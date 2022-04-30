@@ -23,6 +23,7 @@ from vocoder import inference as vocoder
 app = flask.Flask(__name__)
 CORS(app)
 
+
 # entry point of this gcloud function
 # Expects requests to be sent via POST method.
 # In case of a non-POST Request it will respond with get_version().
@@ -32,15 +33,24 @@ CORS(app)
 @app.route("/vocode", methods=['GET', 'POST'])
 @app.route("/render", methods=['GET', 'POST'])
 def handle_request():
-    # Parse request data
+    # Evaluate request
     request = flask.request
     method = request.method
-    request_data = request.get_json()
 
     # Default route for non-post or bad request
-    if method != 'POST' or not request_data:
+    if method != 'POST' or not request.is_json:
         response, code = get_version(request)
         return flask.make_response(response, code)
+
+    # Token Auth
+    if check_token_auth(request.headers.get('api-key')) is False:
+        response = {
+            "error": "invalid client token provided"
+        }
+        return flask.make_response(response, 403)
+
+    # Parse request data
+    request_data = request.get_json()
 
     # Get route and forward request
     if 'encode' in request.path:
@@ -273,6 +283,13 @@ def process_vocode_request(request_data):
 def process_render_request(request_data):
     return {"success":"vocoder function triggered"}, 200
 
+# check_token_auth validates a provided endpoint token
+def check_token_auth(client_token):
+    env_token = os.environ.get("END_POINT_TOKEN", "")
+    if len(env_token) == 0 or client_token != env_token:
+        return False
+    return True
+
 # get_version returns basic info on this gcloud function
 def get_version(request=None):
     response = {
@@ -284,7 +301,7 @@ def get_version(request=None):
         response["request_info"] = {
             "method": request.method,
             "args": request.args,
-            "data": request.get_json(),
+            "data": request.get_json() if request.is_json else "",
             "route": request.path
         }
     return response, 200
