@@ -35,12 +35,6 @@ CORS(app)
 def handle_request():
     # Evaluate request
     request = flask.request
-    method = request.method
-
-    # Default route for non-post or bad request
-    if method != 'POST' or not request.is_json:
-        response, code = get_version(request)
-        return flask.make_response(response, code)
 
     # Token Auth
     if check_token_auth(request.headers.get('api-key')) is False:
@@ -48,6 +42,12 @@ def handle_request():
             "error": "invalid client token provided"
         }
         return flask.make_response(response, 403)
+
+    # Default route for non-post or bad request
+    method = request.method
+    if method != 'POST' or not request.is_json:
+        response, code = get_version(request)
+        return flask.make_response(response, code)
 
     # Parse request data
     request_data = request.get_json()
