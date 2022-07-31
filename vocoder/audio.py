@@ -1,9 +1,11 @@
 import math
-import numpy as np
+
 import librosa
-import vocoder.hparams as hp
-from scipy.signal import lfilter
+import numpy as np
 import soundfile as sf
+from scipy.signal import lfilter
+
+from config.hparams import sp
 
 
 def label_2_float(x, bits) :
@@ -17,11 +19,11 @@ def float_2_label(x, bits) :
 
 
 def load_wav(path) :
-    return librosa.load(str(path), sr=hp.sample_rate)[0]
+    return librosa.load(str(path), sr=sp.sample_rate)[0]
 
 
 def save_wav(x, path) :
-    sf.write(path, x.astype(np.float32), hp.sample_rate)
+    sf.write(path, x.astype(np.float32), sp.sample_rate)
 
 
 def split_signal(x) :
@@ -50,15 +52,15 @@ def linear_to_mel(spectrogram):
 
 
 def build_mel_basis():
-    return librosa.filters.mel(hp.sample_rate, hp.n_fft, n_mels=hp.num_mels, fmin=hp.fmin)
+    return librosa.filters.mel(sp.sample_rate, sp.n_fft, n_mels=sp.num_mels, fmin=sp.fmin)
 
 
 def normalize(S):
-    return np.clip((S - hp.min_level_db) / -hp.min_level_db, 0, 1)
+    return np.clip((S - sp.min_level_db) / -sp.min_level_db, 0, 1)
 
 
 def denormalize(S):
-    return (np.clip(S, 0, 1) * -hp.min_level_db) + hp.min_level_db
+    return (np.clip(S, 0, 1) * -sp.min_level_db) + sp.min_level_db
 
 
 def amp_to_db(x):
@@ -71,7 +73,7 @@ def db_to_amp(x):
 
 def spectrogram(y):
     D = stft(y)
-    S = amp_to_db(np.abs(D)) - hp.ref_level_db
+    S = amp_to_db(np.abs(D)) - sp.ref_level_db
     return normalize(S)
 
 
@@ -82,15 +84,15 @@ def melspectrogram(y):
 
 
 def stft(y):
-    return librosa.stft(y=y, n_fft=hp.n_fft, hop_length=hp.hop_length, win_length=hp.win_length)
+    return librosa.stft(y=y, n_fft=sp.n_fft, hop_length=sp.hop_length, win_length=sp.win_length)
 
 
 def pre_emphasis(x):
-    return lfilter([1, -hp.preemphasis], [1], x)
+    return lfilter([1, -sp.preemphasis], [1], x)
 
 
 def de_emphasis(x):
-    return lfilter([1], [1, -hp.preemphasis], x)
+    return lfilter([1], [1, -sp.preemphasis], x)
 
 
 def encode_mu_law(x, mu) :

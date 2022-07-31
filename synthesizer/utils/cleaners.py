@@ -11,7 +11,11 @@ hyperparameter. Some cleaners are English-specific. You"ll typically want to use
 """
 
 import re
+from typing import Any, Dict
+
+from phonemizer.phonemize import phonemize
 from unidecode import unidecode
+
 from .numbers import normalize_numbers
 
 # Regular expression matching whitespace:
@@ -68,6 +72,8 @@ def lowercase(text):
 def collapse_whitespace(text):
   return re.sub(_whitespace_re, " ", text)
 
+def no_cleaners(text):
+  return text
 
 def convert_to_ascii(text):
   return unidecode(text)
@@ -96,3 +102,48 @@ def english_cleaners(text):
   text = expand_abbreviations(text)
   text = collapse_whitespace(text)
   return text
+
+# def to_phonemes(text: str, lang: str) -> str:
+#   phonemes = phonemize(text,
+#                        language=lang,
+#                        backend='espeak',
+#                        strip=True,
+#                        preserve_punctuation=True,
+#                        with_stress=False,
+#                        njobs=1,
+#                        punctuation_marks=';:,.!?¡¿—…"«»“”()',
+#                        language_switch='remove-flags')
+#   phonemes = ''.join([p for p in phonemes if p in phonemes_set])
+#   return phonemes
+
+class Cleaner:
+
+  def __init__(self,
+               cleaner_name: str,
+               use_phonemes: bool,
+               lang: str) -> None:
+    if cleaner_name == 'english_cleaners':
+      self.clean_func = english_cleaners
+    elif cleaner_name == 'no_cleaners':
+      self.clean_func = no_cleaners
+    else:
+      raise ValueError(f'Cleaner not supported: {cleaner_name}! '
+                       f'Currently supported: [\'english_cleaners\', \'no_cleaners\']')
+    self.use_phonemes = use_phonemes
+    self.lang = lang
+
+  def __call__(self, text: str) -> str:
+    text = self.clean_func(text)
+    # if self.use_phonemes:
+    #   text = to_phonemes(text, self.lang)
+    text = collapse_whitespace(text)
+    text = text.strip()
+    return text
+
+  @classmethod
+  def from_config(cls, config: Dict[str, Any]) -> 'Cleaner':
+    return Cleaner(
+      cleaner_name=config['preprocessing']['cleaner_name'],
+      use_phonemes=config['preprocessing']['use_phonemes'],
+      lang=config['preprocessing']['language']
+    )
