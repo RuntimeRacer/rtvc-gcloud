@@ -132,9 +132,9 @@ def process_synthesize_request(request_data):
     embed = request_data["speaker_embed"] if "speaker_embed" in request_data else None
     text = request_data["text"] if "text" in request_data else None
     seed = request_data["seed"] if "seed" in request_data else None
-    speed_modifier = float(request_data["speed_modifier"]) if "speed_modifier" in request_data else None
-    pitch_modifier = float(request_data["pitch_modifier"]) if "pitch_modifier" in request_data else None
-    energy_modifier = float(request_data["energy_modifier"]) if "energy_modifier" in request_data else None
+    speed_modifier = request_data["speed_modifier"] if "speed_modifier" in request_data else None
+    pitch_modifier = request_data["pitch_modifier"] if "pitch_modifier" in request_data else None
+    energy_modifier = request_data["energy_modifier"] if "energy_modifier" in request_data else None
 
     # Check input
     if embed is None:
@@ -182,9 +182,9 @@ def process_synthesize_request(request_data):
     pitch_function = lambda x: x
     energy_function = lambda x: x
     if synthesizer.get_model_type() == base.MODEL_TYPE_FORWARD_TACOTRON:
-        speed_function = speed_modifier
-        pitch_function = lambda x: x * pitch_modifier
-        energy_function = lambda x: x * energy_modifier
+        speed_function = float(speed_modifier)
+        pitch_function = lambda x: x * float(pitch_modifier)
+        energy_function = lambda x: x * float(energy_modifier)
 
     sub_spectograms = synthesizer.synthesize_spectrograms(texts=texts, embeddings=embeds, speed_modifier=speed_function, pitch_function=pitch_function, energy_function=energy_function)
 
