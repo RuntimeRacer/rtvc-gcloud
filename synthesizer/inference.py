@@ -47,6 +47,9 @@ class Synthesizer:
         """
         Get the model type
         """
+        # Load the model on the first request.
+        if not self.is_loaded():
+            self.load()
         return self._model_type
 
     def load(self):
