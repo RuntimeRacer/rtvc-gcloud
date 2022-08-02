@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from matplotlib import cm
-from tqdm import tqdm
 
 from encoder import audio
 from encoder.hparams import *
@@ -16,14 +15,14 @@ _model = None  # type: SpeakerEncoder
 _device = None  # type: torch.device
 
 
-def load_model(weights_fpath: Path, device=None, use_tqdm=False):
+def load_model(weights_fpath: Path, device=None):
     """
-    Loads the model in memory. If this function is not explicitely called, it will be run on the 
+    Loads the model in memory. If this function is not explicitely called, it will be run on the
     first call to embed_frames() with the default weights file.
-    
+
     :param weights_fpath: the path to saved model weights.
-    :param device: either a torch device or the name of a torch device (e.g. "cpu", "cuda"). The 
-    model will be loaded and will run on this device. Outputs will however always be on the cpu. 
+    :param device: either a torch device or the name of a torch device (e.g. "cpu", "cuda"). The
+    model will be loaded and will run on this device. Outputs will however always be on the cpu.
     If None, will default to your GPU if it"s available, otherwise your CPU.
     """
     global _model, _device
@@ -38,10 +37,7 @@ def load_model(weights_fpath: Path, device=None, use_tqdm=False):
     _model.load_state_dict(checkpoint["model_state"])
     _model.eval()
 
-    if use_tqdm:
-        tqdm.write("Loaded encoder \"%s\" trained to step %d" % (weights_fpath.name, checkpoint["step"]))
-    else:
-        print("Loaded encoder \"%s\" trained to step %d" % (weights_fpath.name, checkpoint["step"]))
+    print("Loaded encoder \"%s\" trained to step %d" % (weights_fpath.name, checkpoint["step"]))
     
     
 def is_loaded():
