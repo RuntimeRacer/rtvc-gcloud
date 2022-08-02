@@ -13,7 +13,6 @@ hyperparameter. Some cleaners are English-specific. You"ll typically want to use
 import re
 from typing import Any, Dict
 
-from phonemizer.phonemize import phonemize
 from unidecode import unidecode
 
 from .numbers import normalize_numbers
