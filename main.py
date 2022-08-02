@@ -178,15 +178,15 @@ def process_synthesize_request(request_data):
     embeds = [embed] * len(texts)
 
     # Params for advanced model
-    speed_modifier = 1.0
+    speed_function = 1.0
     pitch_function = lambda x: x
     energy_function = lambda x: x
     if synthesizer.get_model_type() == base.MODEL_TYPE_FORWARD_TACOTRON:
-        speed_modifier = speed_modifier
+        speed_function = speed_modifier
         pitch_function = lambda x: x * pitch_modifier
         energy_function = lambda x: x * energy_modifier
 
-    sub_spectograms = synthesizer.synthesize_spectrograms(texts=texts, embeddings=embeds, speed_modifier=speed_modifier, pitch_function=pitch_function, energy_function=energy_function)
+    sub_spectograms = synthesizer.synthesize_spectrograms(texts=texts, embeddings=embeds, speed_modifier=speed_function, pitch_function=pitch_function, energy_function=energy_function)
 
     # Get speech breaks and store as JSON list
     breaks = [subspec.shape[1] for subspec in sub_spectograms]
