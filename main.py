@@ -256,6 +256,17 @@ def process_vocode_request(request_data):
     if not load_vocoder():
         return "vocoder model not found", 500
 
+    # Perform the vocoding
+    wav_string = do_vocode(syn_mel, syn_breaks)
+
+    # Build response
+    response = {
+        "generated_wav": base64.b64encode(wav_string).decode('utf-8')
+    }
+
+    return response, 200
+
+def do_vocode(syn_mel, syn_breaks):
     # Apply vocoder on mel
     wav = vocoder.infer_waveform(syn_mel)
 
@@ -267,20 +278,14 @@ def process_vocode_request(request_data):
     wav = np.concatenate([i for w, b in zip(wavs, syn_breaks) for i in (w, b)])
 
     # Apply optimizations
-    wav = preprocess_wav(wav) # Trim silences
-    wav = wav / np.abs(wav).max() * 0.97 # Normalize
+    wav = preprocess_wav(wav)  # Trim silences
+    wav = wav / np.abs(wav).max() * 0.97  # Normalize
 
     # Encode as WAV
     with io.BytesIO() as handle:
         sf.write(handle, wav.astype(np.float32), samplerate=sp.sample_rate, format='wav')
         wav_string = handle.getvalue()
-
-    # Build response
-    response = {
-        "generated_wav": base64.b64encode(wav_string).decode('utf-8')
-    }
-
-    return response, 200
+    return wav_string
 
 # process_render_request -> Performs synthesize & vocode in a single step
 # Input params:
@@ -333,10 +338,17 @@ def process_render_request(request_data):
         return "vocoder model not found", 500
 
     # Perform the synthesis
-    full_spectogram, breaks = do_synthesis(text, embed, speed_modifier, pitch_modifier, energy_modifier)
+    syn_mel, syn_breaks = do_synthesis(text, embed, speed_modifier, pitch_modifier, energy_modifier)
 
     # Perform the vocoding
+    wav_string = do_vocode(syn_mel, syn_breaks)
 
+    # Build response
+    response = {
+        "generated_wav": base64.b64encode(wav_string).decode('utf-8')
+    }
+
+    return response, 200
 
 # load_encoder loads the encoder into memory
 def load_encoder():
