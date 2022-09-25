@@ -6,7 +6,7 @@ FROM python:3.8.12-bullseye
 ENV PYTHONUNBUFFERED True
 
 # Install build dependencies.
-RUN apt-get update -y && apt-get install -y --no-install-recommends build-essential gcc curl libsndfile1
+RUN apt-get update -y && apt-get install -y --no-install-recommends build-essential cmake libeigen3-dev gcc curl libsndfile1 zlib1g-dev
 
 # Setup venv for building all requirements and add it to path
 RUN python -m venv /opt/venv
@@ -15,6 +15,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Install requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Build and install libwavernn
+WORKDIR vocoder/libwavernn
+RUN build.sh
 
 # Get and install gcloud SDK to access storage
 RUN curl https://sdk.cloud.google.com | bash > /dev/null
