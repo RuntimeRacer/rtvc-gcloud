@@ -3,9 +3,6 @@
 # IMPORTANT! - WaveRNN Module variant to build
 BUILD_VARIANT="runtimeracer_version"
 
-# Get required packages
-sudo apt-get install cmake gcc libeigen3-dev python3-dev python3-distutils zlib1g-dev
-
 # Uninstall any old version of the lib
 # pip uninstall WaveRNNVocoder
 

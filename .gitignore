@@ -131,6 +131,10 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# RTVC
+*.pt
+*.wav
+
 # cmake & pybind
 cmake-build*
 pybind11
