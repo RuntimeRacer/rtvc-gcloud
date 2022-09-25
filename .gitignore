@@ -130,3 +130,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# cmake & pybind
+cmake-build*
+pybind11
