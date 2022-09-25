@@ -40,7 +40,7 @@ class Vocoder:
         """
         # Get max availiable physical threads of this CPU
         # TODO: Find out if this is faster when using physical vs logical
-        cpus = psutil.cpu_count(logical=False)
+        cpus = psutil.cpu_count(logical=True)
         if max_threads is not None and max_threads < cpus:
             cpus = max_threads
 
