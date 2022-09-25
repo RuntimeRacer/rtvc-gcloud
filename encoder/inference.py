@@ -1,41 +1,43 @@
-import logging
 
-from encoder.hparams import *
-from encoder.model import SpeakerEncoder
-from encoder.audio import preprocess_wav   # We want to expose this function from here
-from matplotlib import cm
-from encoder import audio
+
 from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from matplotlib import cm
 
-_model = None # type: SpeakerEncoder
-_device = None # type: torch.device
+from encoder import audio
+from encoder.hparams import *
+from encoder.model import SpeakerEncoder
+
+_model = None  # type: SpeakerEncoder
+_device = None  # type: torch.device
 
 
 def load_model(weights_fpath: Path, device=None):
     """
-    Loads the model in memory. If this function is not explicitely called, it will be run on the 
+    Loads the model in memory. If this function is not explicitely called, it will be run on the
     first call to embed_frames() with the default weights file.
-    
+
     :param weights_fpath: the path to saved model weights.
-    :param device: either a torch device or the name of a torch device (e.g. "cpu", "cuda"). The 
-    model will be loaded and will run on this device. Outputs will however always be on the cpu. 
+    :param device: either a torch device or the name of a torch device (e.g. "cpu", "cuda"). The
+    model will be loaded and will run on this device. Outputs will however always be on the cpu.
     If None, will default to your GPU if it"s available, otherwise your CPU.
     """
-    # TODO: I think the slow loading of the encoder might have something to do with the device it
-    #   was saved on. Worth investigating.
     global _model, _device
+
     if device is None:
         _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    elif isinstance(device, str):
-        _device = torch.device(device)
+    else:
+        _device = device
+
     _model = SpeakerEncoder(_device)
     checkpoint = torch.load(weights_fpath, _device)
     _model.load_state_dict(checkpoint["model_state"])
     _model.eval()
-    logging.log(logging.DEBUG, "Loaded encoder \"%s\" trained to step %d" % (Path(weights_fpath).name, checkpoint["step"]))
+
+    print("Loaded encoder \"%s\" trained to step %d" % (weights_fpath.name, checkpoint["step"]))
     
     
 def is_loaded():

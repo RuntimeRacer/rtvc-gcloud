@@ -15,7 +15,10 @@ import soundfile as sf
 from time import perf_counter as timer
 
 # SV2TTS
+from config.hparams import sp
 from encoder import inference as encoder
+from encoder.audio import preprocess_wav
+from synthesizer.models import base
 from synthesizer.inference import Synthesizer
 from vocoder import inference as vocoder
 
@@ -104,7 +107,7 @@ def process_encode_request(request_data):
             return "encoder model not found", 500
 
     # process wav and generate embedding
-    encoder_wav = encoder.preprocess_wav(wav)
+    encoder_wav = preprocess_wav(wav)
     embed = encoder.embed_utterance(encoder_wav)
 
     # Build response
@@ -129,6 +132,9 @@ def process_synthesize_request(request_data):
     embed = request_data["speaker_embed"] if "speaker_embed" in request_data else None
     text = request_data["text"] if "text" in request_data else None
     seed = request_data["seed"] if "seed" in request_data else None
+    speed_modifier = request_data["speed_modifier"] if "speed_modifier" in request_data else None
+    pitch_modifier = request_data["pitch_modifier"] if "pitch_modifier" in request_data else None
+    energy_modifier = request_data["energy_modifier"] if "energy_modifier" in request_data else None
 
     # Check input
     if embed is None:
@@ -170,7 +176,17 @@ def process_synthesize_request(request_data):
     # Process multiline text as individual synthesis => Maybe Possibility for threaded speedup here
     texts = text.split("\n")
     embeds = [embed] * len(texts)
-    sub_spectograms = synthesizer.synthesize_spectrograms(texts, embeds)
+
+    # Params for advanced model
+    speed_function = 1.0
+    pitch_function = lambda x: x
+    energy_function = lambda x: x
+    if synthesizer.get_model_type() == base.MODEL_TYPE_FORWARD_TACOTRON:
+        speed_function = float(speed_modifier)
+        pitch_function = lambda x: x * float(pitch_modifier)
+        energy_function = lambda x: x * float(energy_modifier)
+
+    sub_spectograms = synthesizer.synthesize_spectrograms(texts=texts, embeddings=embeds, speed_modifier=speed_function, pitch_function=pitch_function, energy_function=energy_function)
 
     # Get speech breaks and store as JSON list
     breaks = [subspec.shape[1] for subspec in sub_spectograms]
@@ -251,19 +267,19 @@ def process_vocode_request(request_data):
     wav = vocoder.infer_waveform(syn_mel)
 
     # Add breaks
-    b_ends = np.cumsum(np.array(syn_breaks) * Synthesizer.hparams.hop_size)
+    b_ends = np.cumsum(np.array(syn_breaks) * sp.hop_size)
     b_starts = np.concatenate(([0], b_ends[:-1]))
     wavs = [wav[start:end] for start, end, in zip(b_starts, b_ends)]
-    syn_breaks = [np.zeros(int(0.15 * Synthesizer.sample_rate))] * len(syn_breaks)
+    syn_breaks = [np.zeros(int(0.15 * sp.sample_rate))] * len(syn_breaks)
     wav = np.concatenate([i for w, b in zip(wavs, syn_breaks) for i in (w, b)])
 
     # Apply optimizations
-    wav = encoder.preprocess_wav(wav) # Trim silences
+    wav = preprocess_wav(wav) # Trim silences
     wav = wav / np.abs(wav).max() * 0.97 # Normalize
 
     # Encode as WAV
     with io.BytesIO() as handle:
-        sf.write(handle, wav.astype(np.float32), samplerate=Synthesizer.sample_rate, format='wav')
+        sf.write(handle, wav.astype(np.float32), samplerate=sp.sample_rate, format='wav')
         wav_string = handle.getvalue()
 
     # Build response
@@ -281,7 +297,7 @@ def process_vocode_request(request_data):
 # Returns:
 # - binary wav file of
 def process_render_request(request_data):
-    return {"success":"vocoder function triggered"}, 200
+    return {"success":"render function triggered"}, 200
 
 # check_token_auth validates a provided endpoint token
 def check_token_auth(client_token):

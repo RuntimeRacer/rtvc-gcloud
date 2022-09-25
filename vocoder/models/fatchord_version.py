@@ -3,8 +3,9 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from vocoder.distribution import sample_from_discretized_mix_logistic
+
 from vocoder.audio import *
+from vocoder.distribution import sample_from_discretized_mix_logistic
 
 
 class ResBlock(nn.Module):
@@ -151,7 +152,7 @@ class WaveRNN(nn.Module):
         x = F.relu(self.fc2(x))
         return self.fc3(x)
 
-    def generate(self, mels, batched, target, overlap, mu_law):
+    def generate(self, mels, batched, target, overlap, mu_law, apply_preemphasis):
         mu_law = mu_law if self.mode == 'RAW' else False
 
         self.eval()
@@ -240,7 +241,7 @@ class WaveRNN(nn.Module):
 
         if mu_law:
             output = decode_mu_law(output, self.n_classes, False)
-        if hp.apply_preemphasis:
+        if apply_preemphasis:
             output = de_emphasis(output)
 
         # Fade-out at the end to avoid signal cutting out suddenly

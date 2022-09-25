@@ -9,6 +9,17 @@ _id_to_symbol = {i: s for i, s in enumerate(symbols)}
 # Regular expression matching text enclosed in curly braces:
 _curly_re = re.compile(r"(.*?)\{(.+?)\}(.*)")
 
+def text_to_sequence_ascii(text):
+  sequence = []
+  for character in text:
+      sequence.append(ord(character))
+  return sequence
+
+def sequence_to_text_ascii(sequence):
+  text = ""
+  for i in sequence:
+    text += chr(i)
+  return text
 
 def text_to_sequence(text, cleaner_names):
   """Converts a string of text to a sequence of IDs corresponding to the symbols in the text.

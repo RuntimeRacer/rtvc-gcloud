@@ -3,20 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
-class HighwayNetwork(nn.Module):
-    def __init__(self, size):
-        super().__init__()
-        self.W1 = nn.Linear(size, size)
-        self.W2 = nn.Linear(size, size)
-        self.W1.bias.data.fill_(0.)
-
-    def forward(self, x):
-        x1 = self.W1(x)
-        x2 = self.W2(x)
-        g = torch.sigmoid(x2)
-        y = g * F.relu(x1) + (1. - g) * x
-        return y
+from synthesizer.models.common_layers import BatchNormConv, HighwayNetwork
 
 
 class Encoder(nn.Module):
@@ -68,19 +55,6 @@ class Encoder(nn.Module):
         # Concatenate the tiled speaker embedding with the encoder output
         x = torch.cat((x, e), 2)
         return x
-
-
-class BatchNormConv(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel, relu=True):
-        super().__init__()
-        self.conv = nn.Conv1d(in_channels, out_channels, kernel, stride=1, padding=kernel // 2, bias=False)
-        self.bnorm = nn.BatchNorm1d(out_channels)
-        self.relu = relu
-
-    def forward(self, x):
-        x = self.conv(x)
-        x = F.relu(x) if self.relu is True else x
-        return self.bnorm(x)
 
 
 class CBHG(nn.Module):
@@ -358,7 +332,9 @@ class Tacotron(nn.Module):
     def forward(self, x, m, speaker_embedding):
         device = next(self.parameters()).device  # use same device as parameters
 
-        self.step += 1
+        if self.training:
+            self.step += 1
+
         batch_size, _, steps  = m.size()
 
         # Initialise all hidden states and pack into tuple
@@ -468,13 +444,12 @@ class Tacotron(nn.Module):
         attn_scores = torch.cat(attn_scores, 1)
         stop_outputs = torch.cat(stop_outputs, 1)
 
-        self.train()
-
         return mel_outputs, linear, attn_scores
 
     def init_model(self):
         for p in self.parameters():
-            if p.dim() > 1: nn.init.xavier_uniform_(p)
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
 
     def get_step(self):
         return self.step.data.item()
@@ -487,12 +462,14 @@ class Tacotron(nn.Module):
         with open(path, "a") as f:
             print(msg, file=f)
 
-    def load(self, path, optimizer=None):
+    def load(self, path, optimizer=None, checkpoint=None):
         # Use device of model params as location for loaded state
-        device = next(self.parameters()).device
-        checkpoint = torch.load(str(path), map_location=device)
-        self.load_state_dict(checkpoint["model_state"])
+        if checkpoint is None:
+            device = next(self.parameters()).device
+            checkpoint = torch.load(str(path), map_location=device)
 
+        # Load weights
+        self.load_state_dict(checkpoint["model_state"])
         if "optimizer_state" in checkpoint and optimizer is not None:
             optimizer.load_state_dict(checkpoint["optimizer_state"])
 
@@ -506,7 +483,6 @@ class Tacotron(nn.Module):
             torch.save({
                 "model_state": self.state_dict(),
             }, str(path))
-
 
     def num_params(self, print_out=True):
         parameters = filter(lambda p: p.requires_grad, self.parameters())
