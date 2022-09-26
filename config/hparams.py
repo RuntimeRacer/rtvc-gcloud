@@ -414,6 +414,6 @@ wavernn_runtimeracer = HParams(
     # Generating / Synthesizing
     gen_at_checkpoint=5,  # number of samples to generate at each checkpoint
     gen_batched=True,  # very fast (realtime+) single utterance batched generation
-    gen_target=3000,  # target number of samples to be generated in each batch entry
-    gen_overlap=1500,  # number of samples for crossfading between batches
+    gen_target=4600,  # target number of samples to be generated in each batch entry
+    gen_overlap=1200,  # number of samples for crossfading between batches
 )

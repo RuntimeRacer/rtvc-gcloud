@@ -31,3 +31,4 @@ sox
 webvtt-py
 # accelerate==0.4.0
 psutil
+noisereduce
