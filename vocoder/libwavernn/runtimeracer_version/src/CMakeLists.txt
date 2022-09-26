@@ -39,8 +39,8 @@ set(CMAKE_CXX_STANDARD 17)
 include_directories(${CNPY_INCLUDE_DIR})
 include_directories(${EIGEN3_INCLUDE_DIR})
 
-SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -ffast-math -march=native")
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ffast-math -march=native")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -ffast-math -march=native")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -ffast-math -march=native")
 
 add_executable(vocoder vocoder.cpp)
 add_library(wavernn wavernn.cpp net_impl.cpp)
