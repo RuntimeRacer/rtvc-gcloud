@@ -39,7 +39,9 @@ BaseLayer *TorchLayer::loadNext(FILE *fd)
     TorchLayer::Header header;
     fread(&header, sizeof(TorchLayer::Header), 1, fd);
 
-    std::cerr << "Loading:" << header.name << std::endl;
+    if (VERBOSE) {
+        std::cerr << "Loading:" << header.name << std::endl;
+    }
 
     switch( header.layerType ){
 

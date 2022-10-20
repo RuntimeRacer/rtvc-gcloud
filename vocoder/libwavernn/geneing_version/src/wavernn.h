@@ -1,14 +1,16 @@
 #ifndef WAVERNN_H
 #define WAVERNN_H
 
-#include <stdio.h>
+#include <cstdio>
+#include <cstdlib>
 #include <vector>
 #include <Eigen/Dense>
 
 using namespace Eigen;
 
+const bool VERBOSE = false; //Disable console output when using the wrapper
 const int SPARSE_GROUP_SIZE = 4; //When pruning we use groups of 4 to reduce index
-const int MULAW_QUANTIZE_CHANNELS = 512;  //same as hparams.mulaw_quantize_channels
+const int MULAW_QUANTIZE_CHANNELS = 512;  //same as hparams.mulaw_quantize_channels (2 ^ BITS)
 const uint8_t ROW_END_MARKER = 255;
 
 typedef Matrix<float, Dynamic, Dynamic, RowMajor> Matrixf;
@@ -30,11 +32,18 @@ class CompMatrix{
 
     void prepData( std::vector<float>& wght, std::vector<uint8_t>& idx )
     {
-        weight = static_cast<float*>(aligned_alloc(32, sizeof(float)*wght.size()));
 
         nGroups = wght.size()/SPARSE_GROUP_SIZE;
+
+#ifdef __linux__
+        weight = static_cast<float*>(aligned_alloc(32, sizeof(float)*wght.size()));
         rowIdx = static_cast<int*>(aligned_alloc(32, sizeof(int)*nGroups));
         colIdx = static_cast<int8_t*>(aligned_alloc(32, sizeof(int8_t)*nGroups));
+#elif _WIN32
+        weight = static_cast<float*>(_aligned_malloc(sizeof(float)*wght.size(), 32));
+        rowIdx = static_cast<int*>(_aligned_malloc(sizeof(int)*nGroups, 32));
+        colIdx = static_cast<int8_t*>(_aligned_malloc(sizeof(int8_t)*nGroups, 32));
+#endif
 
         std::copy(wght.begin(), wght.end(), weight);
 

@@ -5,7 +5,7 @@
 #include <vector>
 #include "wavernn.h"
 
-const int RES_BLOCKS = 5;
+const int RES_BLOCKS = 10;
 const int UPSAMPLE_LAYERS = 3;
 
 Vectorf softmax( const Vectorf& x );
@@ -56,8 +56,8 @@ class Model{
     Resnet resnet;
     TorchLayer I;
     TorchLayer rnn1;
-    TorchLayer fc1;
     TorchLayer rnn2;
+    TorchLayer fc1;
     TorchLayer fc2;
     TorchLayer fc3;
 

@@ -218,7 +218,7 @@ fast_pitch = HParams(
 wavernn_fatchord = HParams(
     # Model
     mode='RAW',  # either 'RAW' (softmax on raw bits) or 'MOL' (sample from mixture of logistics)
-    bits=9,  # bit depth of signal
+    bits=10,  # bit depth of signal
     mu_law=True,  # Recommended to suppress noise if using raw bits in hp.voc_mode
     upsample_factors=(5, 5, 8),  # NB - this needs to correctly factorise hop_length
 
@@ -245,18 +245,18 @@ wavernn_fatchord = HParams(
     # final_lr = amount of loops through the dataset per epoch
     # batch_size = Size of the batches used for inference. Rule of Thumb: Max. 12 units per GB of VRAM of smallest card.
     voc_tts_schedule=[
-        (1, 5e-3, 1e-3, 120),
-        (2, 1e-3, 5e-4, 160),
-        (4, 5e-4, 1e-4, 200),
-        (8, 1e-4, 1e-4, 200),
-        (16, 1e-4, 1e-4, 200),
-        (32, 1e-4, 1e-4, 200),
-        (64, 1e-4, 1e-4, 200),
-        (128, 1e-4, 1e-4, 200),
-        (256, 1e-4, 1e-4, 240),
-        (256, 1e-4, 1e-4, 240),
-        (256, 1e-4, 1e-4, 240),
-        (256, 1e-4, 1e-4, 240),
+        (1, 1e-3, 5e-4, 40),
+        (2, 5e-4, 1e-4, 50),
+        (4, 1e-4, 1e-4, 60),
+        (8, 1e-4, 1e-4, 70),
+        (16, 1e-4, 1e-4, 80),
+        (32, 1e-4, 1e-4, 90),
+        (64, 1e-4, 1e-4, 100),
+        (128, 1e-4, 5e-5, 110),
+        (256, 5e-5, 5e-5, 120),
+        (256, 5e-5, 5e-5, 120),
+        (256, 5e-5, 5e-5, 120),
+        (256, 5e-5, 5e-5, 120),
     ],
 
     # sparsification

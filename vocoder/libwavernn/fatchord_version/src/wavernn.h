@@ -8,6 +8,7 @@
 
 using namespace Eigen;
 
+const bool VERBOSE = false; //Disable console output when using the wrapper
 const int SPARSE_GROUP_SIZE = 4; //When pruning we use groups of 4 to reduce index
 const int MULAW_QUANTIZE_CHANNELS = 1024; //512 (2^9);  //same as hparams.mulaw_quantize_channels (2 ^ BITS)
 const uint8_t ROW_END_MARKER = 255;
@@ -32,11 +33,17 @@ class CompMatrix{
     void prepData( std::vector<float>& wght, std::vector<uint8_t>& idx )
     {
 
-        weight = static_cast<float*>(CompMatrix::aligned_alloc_impl(32, sizeof(float)*wght.size()));
-
         nGroups = wght.size()/SPARSE_GROUP_SIZE;
-        rowIdx = static_cast<int*>(CompMatrix::aligned_alloc_impl(32, sizeof(int)*nGroups));
-        colIdx = static_cast<int8_t*>(CompMatrix::aligned_alloc_impl(32, sizeof(int8_t)*nGroups));
+
+#ifdef __linux__
+        weight = static_cast<float*>(aligned_alloc(32, sizeof(float)*wght.size()));
+        rowIdx = static_cast<int*>(aligned_alloc(32, sizeof(int)*nGroups));
+        colIdx = static_cast<int8_t*>(aligned_alloc(32, sizeof(int8_t)*nGroups));
+#elif _WIN32
+        weight = static_cast<float*>(_aligned_malloc(sizeof(float)*wght.size(), 32));
+        rowIdx = static_cast<int*>(_aligned_malloc(sizeof(int)*nGroups, 32));
+        colIdx = static_cast<int8_t*>(_aligned_malloc(sizeof(int8_t)*nGroups, 32));
+#endif
 
         std::copy(wght.begin(), wght.end(), weight);
 
@@ -55,37 +62,6 @@ class CompMatrix{
         }
         assert( n == nGroups );
     };
-
-#if _WIN32
-    static void *align( std::size_t alignment, std::size_t size,
-                 void *&ptr, std::size_t &space ) {
-        std::uintptr_t pn = reinterpret_cast< std::uintptr_t >( ptr );
-        std::uintptr_t aligned = ( pn + alignment - 1 ) & - alignment;
-        std::size_t padding = aligned - pn;
-        if ( space < size + padding ) return nullptr;
-        space -= padding;
-        return ptr = reinterpret_cast< void * >( aligned );
-    }
-#endif
-
-    static void* aligned_alloc_impl(std::size_t alignment, std::size_t size){
-#ifdef __linux__
-        return std::aligned_alloc(alignment, size);
-#elif _WIN32
-        if(alignment < alignof(void*)) {
-            alignment = alignof(void*);
-        }
-        std::size_t space = size + alignment - 1;
-        void* allocated_mem = ::operator new(space + sizeof(void*));
-        void* aligned_mem = static_cast<void*>(static_cast<char*>(allocated_mem) + sizeof(void*));
-        ////////////// #1 ///////////////
-        CompMatrix::align(alignment, size, aligned_mem, space);
-        ////////////// #2 ///////////////
-        *(static_cast<void**>(aligned_mem) - 1) = allocated_mem;
-        ////////////// #3 ///////////////
-        return aligned_mem;
-#endif
-    }
 
 public:
     CompMatrix()=default;

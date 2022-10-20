@@ -36,9 +36,9 @@ class CompMatrix{
         nGroups = wght.size()/SPARSE_GROUP_SIZE;
 
 #ifdef __linux__
-        weight = static_cast<float*>(std::aligned_alloc(32, sizeof(float)*wght.size()));
-        rowIdx = static_cast<int*>(std::aligned_alloc(32, sizeof(int)*nGroups));
-        colIdx = static_cast<int8_t*>(std::aligned_alloc(32, sizeof(int8_t)*nGroups));
+        weight = static_cast<float*>(aligned_alloc(32, sizeof(float)*wght.size()));
+        rowIdx = static_cast<int*>(aligned_alloc(32, sizeof(int)*nGroups));
+        colIdx = static_cast<int8_t*>(aligned_alloc(32, sizeof(int8_t)*nGroups));
 #elif _WIN32
         weight = static_cast<float*>(_aligned_malloc(sizeof(float)*wght.size(), 32));
         rowIdx = static_cast<int*>(_aligned_malloc(sizeof(int)*nGroups, 32));

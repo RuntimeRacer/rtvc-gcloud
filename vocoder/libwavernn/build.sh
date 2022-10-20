@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # IMPORTANT! - WaveRNN Module variant to build
-BUILD_VARIANT="runtimeracer_version"
+BUILD_VARIANT="fatchord_version"
 
 # Uninstall any old version of the lib
 # pip uninstall WaveRNNVocoder

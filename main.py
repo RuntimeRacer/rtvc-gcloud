@@ -280,8 +280,8 @@ def do_vocode(syn_mel, syn_breaks):
 
     # Apply optimizations
     wav = preprocess_wav(wav)  # Trim silences
-    wav = nr.reduce_noise(y=wav, sr=sp.sample_rate, stationary=False, n_fft=sp.n_fft, hop_length=sp.hop_size,
-                          win_length=sp.win_size, n_jobs=-1)
+    #wav = nr.reduce_noise(y=wav, sr=sp.sample_rate, stationary=False, n_fft=sp.n_fft, hop_length=sp.hop_size,
+    #                      win_length=sp.win_size, n_jobs=-1)
     wav = wav / np.abs(wav).max() * 0.97  # Normalize
 
     # Encode as WAV

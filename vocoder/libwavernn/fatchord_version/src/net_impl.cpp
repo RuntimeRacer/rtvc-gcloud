@@ -100,8 +100,8 @@ void Model::loadNext(FILE *fd)
 
     I.loadNext(fd);
     rnn1.loadNext(fd);
-    fc1.loadNext(fd);
     rnn2.loadNext(fd);
+    fc1.loadNext(fd);
     fc2.loadNext(fd);
     fc3.loadNext(fd);
 }
@@ -164,9 +164,11 @@ Vectorf Model::apply(const Matrixf &mels_in)
     int seq_len = mels.cols();
     int n_aux = aux.rows();
 
-    Matrixf a1_I = aux.block(0, 0, n_aux/2-1, aux.cols()); //we are throwing away the last aux row to keep network input a mulitple of 8.
-    Matrixf a1 = aux.block(0, 0, n_aux/2, aux.cols());
-    Matrixf a2 = aux.block(n_aux/2, 0, n_aux/2, aux.cols());
+    Matrixf a1_I = aux.block(0, 0, n_aux/4-1, aux.cols()); //we are throwing away the last aux row to keep network input a mulitple of 8.
+    Matrixf a1 = aux.block(0, 0, n_aux/4, aux.cols());
+    Matrixf a2 = aux.block(n_aux/4, 0, n_aux/4, aux.cols());
+    Matrixf a3 = aux.block(2*(n_aux/4), 0, n_aux/4, aux.cols());
+    Matrixf a4 = aux.block(3*(n_aux/4), 0, n_aux/4, aux.cols());
 
     Vectorf wav_out(seq_len);     //output vector
 
@@ -182,24 +184,24 @@ Vectorf Model::apply(const Matrixf &mels_in)
         h1 = rnn1( y, h1 );
         y += h1;
 
-        y = vstack( y, a2.col(i) );
-        y = relu( fc1( y ) );
-
-        h2 = rnn2(y, h2);
+        inp = vstack( y, a2.col(i) );
+        h2 = rnn2(inp, h2);
         y += h2;
 
-        y = vstack( y, a1.col(i) );
+        y = vstack( y, a3.col(i) );
+        y = relu( fc1( y ) );
+
+        y = vstack( y, a4.col(i) );
         y = relu(fc2( y ));
 
-        y = vstack( y, a2.col(i) );
         Vectorf logits = fc3( y );
 
         Vectorf posterior = softmax( logits );
 
         float newAmplitude = sampleCategorical( posterior );
         // TODO: Make this nice / Parameterized based on model type to be provided on Read to the lib
-        newAmplitude = (2.*newAmplitude) / (posterior.size()-1.) - 1.; //for bits output; but also when doing MuLaw
-        //newAmplitude = invMulawQuantize( newAmplitude );   //mulaw output
+        newAmplitude = (2.*newAmplitude) / (posterior.size()-1.) - 1.; //for bits output; for Mulaw see below
+        //newAmplitude = invMulawQuantize( newAmplitude );   //mulaw output -> Works different if used per frame; normalization on whole wav using numpy is a lot smoother; see python implementation.
         wav_out(i) = x(0) = newAmplitude;
 
     }
