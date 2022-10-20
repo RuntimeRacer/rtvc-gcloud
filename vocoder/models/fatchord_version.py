@@ -90,7 +90,7 @@ class UpsampleNetwork(nn.Module):
 class WaveRNN(nn.Module):
     def __init__(self, rnn_dims, fc_dims, bits, pad, upsample_factors,
                  feat_dims, compute_dims, res_out_dims, res_blocks,
-                 hop_length, sample_rate, mode='RAW'):
+                 hop_length, sample_rate, mode='RAW', pruning=False):
         super().__init__()
         self.mode = mode
         self.pad = pad
@@ -113,6 +113,8 @@ class WaveRNN(nn.Module):
         self.fc1 = nn.Linear(rnn_dims + self.aux_dims, fc_dims)
         self.fc2 = nn.Linear(fc_dims + self.aux_dims, fc_dims)
         self.fc3 = nn.Linear(fc_dims, self.n_classes)
+
+        self.prune_layers = [self.I, self.rnn1, self.rnn2, self.fc1, self.fc2, self.fc3] if pruning else []
 
         self.step = nn.Parameter(torch.zeros(1).long(), requires_grad=False)
         self.num_params()
