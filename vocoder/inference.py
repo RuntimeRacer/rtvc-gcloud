@@ -55,7 +55,7 @@ def load_model(weights_fpath, voc_type=base.VOC_TYPE_PYTORCH, verbose=True):
 def is_loaded():
     return _model is not None
 
-def infer_waveform(mel, normalize=True, batched=True, target=None, overlap=None, progress_callback=None):
+def infer_waveform(mel, normalize=True, batched=True, target=None, overlap=None):
     """
     Infers the waveform of a mel spectrogram output by the synthesizer (the format must match
     that of the synthesizer!)
@@ -70,7 +70,7 @@ def infer_waveform(mel, normalize=True, batched=True, target=None, overlap=None,
         raise Exception("Please load Wave-RNN in memory before using it")
 
     if _model_type == base.VOC_TYPE_CPP:
-        wav = _model.vocode_mel(mel=mel, normalize=normalize, progress_callback=progress_callback)
+        wav = _model.vocode_mel(mel=mel, normalize=normalize)
         return wav
     else:
         if _model_type == base.MODEL_TYPE_FATCHORD:
@@ -90,7 +90,7 @@ def infer_waveform(mel, normalize=True, batched=True, target=None, overlap=None,
         if normalize:
             mel = mel / sp.max_abs_value
         mel = torch.from_numpy(mel[None, ...])
-        wav = _model.generate(mel, batched, target, overlap, hp_wavernn.mu_law, sp.preemphasize, progress_callback)
+        wav = _model.generate(mel, batched, target, overlap, hp_wavernn.mu_law, sp.preemphasize)
         return wav
 
 def set_seed(seed):
