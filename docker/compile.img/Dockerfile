@@ -40,6 +40,7 @@ RUN mkdir -p "/cpuvocoder/vocoder"
 COPY ./config/ ./cpuvocoder/config
 COPY ./vocoder/ ./cpuvocoder/vocoder
 WORKDIR /cpuvocoder/vocoder/libwavernn
+RUN chmod +x ./build.sh
 RUN ./build.sh
 
 # Convert vocoder model into binary form
