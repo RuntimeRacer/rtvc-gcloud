@@ -184,7 +184,7 @@ Vectorf Model::apply(const Matrixf &mels_in)
         h1 = rnn1( y, h1 );
         y += h1;
 
-        inp = vstack( y, a2.col(i) );
+        Vectorf inp = vstack( y, a2.col(i) );
         h2 = rnn2(inp, h2);
         y += h2;
 
