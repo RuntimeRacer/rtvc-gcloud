@@ -46,7 +46,7 @@ RUN ./build.sh
 # Convert vocoder model into binary form
 WORKDIR /cpuvocoder
 RUN mv vocoder/vocoder_convert_model.py vocoder_convert_model.py
-RUN python vocoder_convert_model.py /var/models/vocoder.pt --default_model_type runtimeracer-wavernn --out_dir /var/models/
+RUN python vocoder_convert_model.py /var/models/vocoder.pt --default_model_type fatchord-wavernn --out_dir /var/models/
 
 # Drop fdir and Switch back to default workdir
 WORKDIR /
