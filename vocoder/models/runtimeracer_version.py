@@ -1,11 +1,19 @@
+"""
+© 2022 RuntimeRacer
+
+Optimized WaveRNN Vocoder Model for high speed & quality inference.
+Original WaveRNN Designs by Fatchord & Geneing!
+
+Optimized for high CPU inference speed without compromising voice quality.
+
+"""
 import time
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from vocoder.audio import *
 from vocoder.distribution import sample_from_discretized_mix_logistic
+from vocoder.audio import *
 
 
 class ResBlock(nn.Module):
@@ -94,9 +102,10 @@ class WaveRNN(nn.Module):
         super().__init__()
         self.mode = mode
         self.pad = pad
-        if self.mode == 'RAW' :
+        if self.mode == 'RAW':
             self.n_classes = 2 ** bits
-        elif self.mode == 'MOL' :
+        elif self.mode == 'MOL':
+            # mixture requires multiple of 3, default at 10 component mixture, i.e 3 x 10 = 30
             self.n_classes = 30
         else :
             RuntimeError("Unknown model mode value - ", self.mode)
@@ -107,27 +116,40 @@ class WaveRNN(nn.Module):
         self.sample_rate = sample_rate
 
         self.upsample = UpsampleNetwork(feat_dims, upsample_factors, compute_dims, res_blocks, res_out_dims, pad)
-        self.I = nn.Linear(feat_dims + self.aux_dims - 1 + 1, rnn_dims)
+        self.I = nn.Linear(feat_dims + self.aux_dims - 1 + 1, rnn_dims)  # First dimension has to be divizible by 8, so we take away one aux channel
+        # This mimics 1x512 RNN
         self.rnn1 = nn.GRU(rnn_dims, rnn_dims, batch_first=True)
-        self.rnn2 = nn.GRU(rnn_dims + self.aux_dims, rnn_dims, batch_first=True)
+        self.rnn2 = nn.GRU(rnn_dims, rnn_dims, batch_first=True)
+        # This mimics 1x512 RNN
+        self.rnn3 = nn.GRU(rnn_dims + self.aux_dims, rnn_dims, batch_first=True)
+        self.rnn4 = nn.GRU(rnn_dims, rnn_dims, batch_first=True)
+        # This mimics 1x512 FC
         self.fc1 = nn.Linear(rnn_dims + self.aux_dims, fc_dims)
-        self.fc2 = nn.Linear(fc_dims + self.aux_dims, fc_dims)
-        self.fc3 = nn.Linear(fc_dims, self.n_classes)
+        self.fc2 = nn.Linear(fc_dims, fc_dims)
+        # This mimics 1x512 FC
+        self.fc3 = nn.Linear(rnn_dims + self.aux_dims, fc_dims)
+        self.fc4 = nn.Linear(fc_dims, fc_dims)
+        self.fc5 = nn.Linear(fc_dims, self.n_classes)
 
-        self.prune_layers = [self.I, self.rnn1, self.rnn2, self.fc1, self.fc2, self.fc3] if pruning else []
+        self.prune_layers = [self.I, self.rnn1, self.rnn2, self.rnn3, self.rnn4, self.fc1, self.fc2, self.fc3, self.fc4, self.fc5] if pruning else []
 
         self.step = nn.Parameter(torch.zeros(1).long(), requires_grad=False)
         self.num_params()
 
     def forward(self, x, mels):
-        self.step += 1
+        if self.training:
+            self.step += 1
         bsize = x.size(0)
         if torch.cuda.is_available():
             h1 = torch.zeros(1, bsize, self.rnn_dims).cuda()
             h2 = torch.zeros(1, bsize, self.rnn_dims).cuda()
+            h3 = torch.zeros(1, bsize, self.rnn_dims).cuda()
+            h4 = torch.zeros(1, bsize, self.rnn_dims).cuda()
         else:
             h1 = torch.zeros(1, bsize, self.rnn_dims).cpu()
             h2 = torch.zeros(1, bsize, self.rnn_dims).cpu()
+            h3 = torch.zeros(1, bsize, self.rnn_dims).cpu()
+            h4 = torch.zeros(1, bsize, self.rnn_dims).cpu()
         mels, aux = self.upsample(mels)
 
         aux_idx = [self.aux_dims * i for i in range(5)]
@@ -138,21 +160,41 @@ class WaveRNN(nn.Module):
 
         x = torch.cat([x.unsqueeze(-1), mels, a1[:,:,:-1]], dim=2)
         x = self.I(x)
+
+        # 2x RNN-256 mimicing RNN-512
         res = x
         x, _ = self.rnn1(x, h1)
-
         x = x + res
         res = x
-        x = torch.cat([x, a2], dim=2)
         x, _ = self.rnn2(x, h2)
-
         x = x + res
+
+        res = x
+        x = torch.cat([x, a2], dim=2)
+        # 2x RNN-256 mimicing RNN-512
+        x, _ = self.rnn3(x, h3)
+        x = x + res
+        res = x
+        x, _ = self.rnn4(x, h4)
+        x = x + res
+
         x = torch.cat([x, a3], dim=2)
-        x = F.relu(self.fc1(x))
+        # 2x FC-256 mimicing FC-512
+        x = self.fc1(x)
+        x = F.relu(self.fc2(x))
 
         x = torch.cat([x, a4], dim=2)
-        x = F.relu(self.fc2(x))
-        return self.fc3(x)
+        # 2x FC-256 mimicing FC-512
+        x = self.fc3(x)
+        x = F.relu(self.fc4(x))
+
+        x = self.fc5(x)
+
+        return x
+
+    def preview_upsampling(self, mels) :
+        mels, aux = self.upsample(mels)
+        return mels, aux
 
     def generate(self, mels, batched, target, overlap, mu_law, apply_preemphasis):
         mu_law = mu_law if self.mode == 'RAW' else False
@@ -162,6 +204,8 @@ class WaveRNN(nn.Module):
         start = time.time()
         rnn1 = self.get_gru_cell(self.rnn1)
         rnn2 = self.get_gru_cell(self.rnn2)
+        rnn3 = self.get_gru_cell(self.rnn3)
+        rnn4 = self.get_gru_cell(self.rnn4)
 
         with torch.no_grad():
             if torch.cuda.is_available():
@@ -181,10 +225,14 @@ class WaveRNN(nn.Module):
             if torch.cuda.is_available():
                 h1 = torch.zeros(b_size, self.rnn_dims).cuda()
                 h2 = torch.zeros(b_size, self.rnn_dims).cuda()
+                h3 = torch.zeros(b_size, self.rnn_dims).cuda()
+                h4 = torch.zeros(b_size, self.rnn_dims).cuda()
                 x = torch.zeros(b_size, 1).cuda()
             else:
                 h1 = torch.zeros(b_size, self.rnn_dims).cpu()
                 h2 = torch.zeros(b_size, self.rnn_dims).cpu()
+                h3 = torch.zeros(b_size, self.rnn_dims).cpu()
+                h4 = torch.zeros(b_size, self.rnn_dims).cpu()
                 x = torch.zeros(b_size, 1).cpu()
 
             d = self.aux_dims
@@ -198,32 +246,37 @@ class WaveRNN(nn.Module):
 
                 x = torch.cat([x, m_t, a1_t[:,:-1]], dim=1)
                 x = self.I(x)
+
                 h1 = rnn1(x, h1)
-
                 x = x + h1
-                inp = torch.cat([x, a2_t], dim=1)
-                h2 = rnn2(inp, h2)
-
+                h2 = rnn2(x, h2)
                 x = x + h2
-                x = torch.cat([x, a3_t], dim=1)
-                x = F.relu(self.fc1(x))
 
-                x = torch.cat([x, a4_t], dim=1)
+                inp = torch.cat([x, a2_t], dim=1)
+                h3 = rnn3(inp, h3)
+                x = x + h3
+                h4 = rnn4(x, h4)
+                x = x + h4
+
+                x = torch.cat([x, a3_t], dim=1)
+                x = self.fc1(x)
                 x = F.relu(self.fc2(x))
 
-                logits = self.fc3(x)
+                x = torch.cat([x, a4_t], dim=1)
+                x = self.fc3(x)
+                x = F.relu(self.fc4(x))
+
+                x = self.fc5(x)
 
                 if self.mode == 'MOL':
-                    sample = sample_from_discretized_mix_logistic(logits.unsqueeze(0).transpose(1, 2))
+                    sample = sample_from_discretized_mix_logistic(x.unsqueeze(0).transpose(1, 2))
                     output.append(sample.view(-1))
                     if torch.cuda.is_available():
-                        # x = torch.FloatTensor([[sample]]).cuda()
                         x = sample.transpose(0, 1).cuda()
                     else:
                         x = sample.transpose(0, 1)
-
-                elif self.mode == 'RAW' :
-                    posterior = F.softmax(logits, dim=1)
+                elif self.mode == 'RAW':
+                    posterior = F.softmax(x, dim=1)
                     distrib = torch.distributions.Categorical(posterior)
 
                     sample = 2 * distrib.sample().float() / (self.n_classes - 1.) - 1.
@@ -235,7 +288,7 @@ class WaveRNN(nn.Module):
         output = torch.stack(output).transpose(0, 1)
         output = output.cpu().numpy()
         output = output.astype(np.float64)
-        
+
         if batched:
             output = self.xfade_and_unfold(output, target, overlap)
         else:
@@ -250,7 +303,7 @@ class WaveRNN(nn.Module):
         fade_out = np.linspace(1, 0, 20 * self.hop_length)
         output = output[:wave_len]
         output[-20 * self.hop_length:] *= fade_out
-        
+
         self.train()
 
         return output

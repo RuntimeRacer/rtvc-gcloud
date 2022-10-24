@@ -1,7 +1,23 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
+from torch.distributions import Beta, Normal
 
+
+def sample_from_beta_dist(y_hat):
+    """
+    y_hat (batch_size x seq_len x 2):
+
+    """
+    # take exponentional to ensure positive
+    loc_y = y_hat.exp()
+    alpha = loc_y[:, :, 0].unsqueeze(-1)
+    beta = loc_y[:, :, 1].unsqueeze(-1)
+    dist = Beta(alpha, beta)
+    sample = dist.sample()
+    # rescale sample from [0,1] to [-1, 1]
+    sample = 2.0 * sample - 1.0
+    return sample
 
 def log_sum_exp(x):
     """ numerically stable log_sum_exp implementation that prevents overflow """

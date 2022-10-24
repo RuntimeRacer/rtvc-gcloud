@@ -3,9 +3,8 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from vocoder.distribution import sample_from_discretized_mix_logistic, sample_from_beta_dist
 from vocoder.audio import *
-from vocoder.distribution import sample_from_discretized_mix_logistic
 
 
 class ResBlock(nn.Module):
@@ -29,7 +28,7 @@ class ResBlock(nn.Module):
 class MelResNet(nn.Module):
     def __init__(self, res_blocks, in_dims, compute_dims, res_out_dims, pad):
         super().__init__()
-        k_size = pad * 2 + 1
+        k_size = pad * 2 + 1 # TODO: This might interfere with optimizations
         self.conv_in = nn.Conv1d(in_dims, compute_dims, kernel_size=k_size, bias=False)
         self.batch_norm = nn.BatchNorm1d(compute_dims)
         self.layers = nn.ModuleList()
@@ -90,69 +89,71 @@ class UpsampleNetwork(nn.Module):
 class WaveRNN(nn.Module):
     def __init__(self, rnn_dims, fc_dims, bits, pad, upsample_factors,
                  feat_dims, compute_dims, res_out_dims, res_blocks,
-                 hop_length, sample_rate, mode='RAW', pruning=False):
+                 hop_length, sample_rate, mode='BITS', pruning=False):
         super().__init__()
         self.mode = mode
         self.pad = pad
-        if self.mode == 'RAW' :
-            self.n_classes = 2 ** bits
-        elif self.mode == 'MOL' :
+        if self.mode == 'RAW':
+            self.n_classes = 2
+        elif self.mode == 'MOL':
+            # mixture requires multiple of 3, default at 10 component mixture, i.e 3 x 10 = 30
             self.n_classes = 30
-        else :
-            RuntimeError("Unknown model mode value - ", self.mode)
+        elif self.mode == 'BITS':
+            self.n_classes = 2 ** bits
+        else:
+            raise ValueError("input_type: {self.mode} not supported")
 
         self.rnn_dims = rnn_dims
-        self.aux_dims = res_out_dims // 4
+        self.aux_dims = res_out_dims // 2
         self.hop_length = hop_length
         self.sample_rate = sample_rate
 
         self.upsample = UpsampleNetwork(feat_dims, upsample_factors, compute_dims, res_blocks, res_out_dims, pad)
-        self.I = nn.Linear(feat_dims + self.aux_dims - 1 + 1, rnn_dims)
+        self.I = nn.Linear(feat_dims + self.aux_dims - 1 + 1, rnn_dims)  # First dimension has to be divizible by 8, so we take away one aux channel
         self.rnn1 = nn.GRU(rnn_dims, rnn_dims, batch_first=True)
-        self.rnn2 = nn.GRU(rnn_dims + self.aux_dims, rnn_dims, batch_first=True)
         self.fc1 = nn.Linear(rnn_dims + self.aux_dims, fc_dims)
-        self.fc2 = nn.Linear(fc_dims + self.aux_dims, fc_dims)
         self.fc3 = nn.Linear(fc_dims, self.n_classes)
 
-        self.prune_layers = [self.I, self.rnn1, self.rnn2, self.fc1, self.fc2, self.fc3] if pruning else []
+        self.prune_layers = [self.I, self.rnn1, self.fc1, self.fc3] if pruning else []
 
         self.step = nn.Parameter(torch.zeros(1).long(), requires_grad=False)
         self.num_params()
 
     def forward(self, x, mels):
-        self.step += 1
+        if self.training:
+            self.step += 1
         bsize = x.size(0)
         if torch.cuda.is_available():
             h1 = torch.zeros(1, bsize, self.rnn_dims).cuda()
-            h2 = torch.zeros(1, bsize, self.rnn_dims).cuda()
         else:
             h1 = torch.zeros(1, bsize, self.rnn_dims).cpu()
-            h2 = torch.zeros(1, bsize, self.rnn_dims).cpu()
         mels, aux = self.upsample(mels)
 
-        aux_idx = [self.aux_dims * i for i in range(5)]
+        aux_idx = [self.aux_dims * i for i in range(3)]
         a1 = aux[:, :, aux_idx[0]:aux_idx[1]]
         a2 = aux[:, :, aux_idx[1]:aux_idx[2]]
-        a3 = aux[:, :, aux_idx[2]:aux_idx[3]]
-        a4 = aux[:, :, aux_idx[3]:aux_idx[4]]
 
         x = torch.cat([x.unsqueeze(-1), mels, a1[:,:,:-1]], dim=2)
         x = self.I(x)
         res = x
         x, _ = self.rnn1(x, h1)
-
         x = x + res
-        res = x
+
         x = torch.cat([x, a2], dim=2)
-        x, _ = self.rnn2(x, h2)
-
-        x = x + res
-        x = torch.cat([x, a3], dim=2)
         x = F.relu(self.fc1(x))
 
-        x = torch.cat([x, a4], dim=2)
-        x = F.relu(self.fc2(x))
-        return self.fc3(x)
+        x = self.fc3(x)
+
+        if self.mode == 'RAW' or self.mode == 'MOL':
+            return x
+        elif self.mode == 'BITS':
+            return F.log_softmax(x, dim=-1)
+        else:
+            raise ValueError("input_type: {self.mode} not supported")
+
+    def preview_upsampling(self, mels) :
+        mels, aux = self.upsample(mels)
+        return mels, aux
 
     def generate(self, mels, batched, target, overlap, mu_law, apply_preemphasis):
         mu_law = mu_law if self.mode == 'RAW' else False
@@ -161,7 +162,6 @@ class WaveRNN(nn.Module):
         output = []
         start = time.time()
         rnn1 = self.get_gru_cell(self.rnn1)
-        rnn2 = self.get_gru_cell(self.rnn2)
 
         with torch.no_grad():
             if torch.cuda.is_available():
@@ -180,50 +180,43 @@ class WaveRNN(nn.Module):
 
             if torch.cuda.is_available():
                 h1 = torch.zeros(b_size, self.rnn_dims).cuda()
-                h2 = torch.zeros(b_size, self.rnn_dims).cuda()
                 x = torch.zeros(b_size, 1).cuda()
             else:
                 h1 = torch.zeros(b_size, self.rnn_dims).cpu()
-                h2 = torch.zeros(b_size, self.rnn_dims).cpu()
                 x = torch.zeros(b_size, 1).cpu()
 
             d = self.aux_dims
-            aux_split = [aux[:, :, d * i:d * (i + 1)] for i in range(4)]
+            aux_split = [aux[:, :, d * i:d * (i + 1)] for i in range(2)]
 
             for i in range(seq_len):
 
                 m_t = mels[:, i, :]
 
-                a1_t, a2_t, a3_t, a4_t = (a[:, i, :] for a in aux_split)
+                a1_t, a2_t = (a[:, i, :] for a in aux_split)
 
                 x = torch.cat([x, m_t, a1_t[:,:-1]], dim=1)
                 x = self.I(x)
                 h1 = rnn1(x, h1)
 
                 x = x + h1
-                inp = torch.cat([x, a2_t], dim=1)
-                h2 = rnn2(inp, h2)
-
-                x = x + h2
-                x = torch.cat([x, a3_t], dim=1)
+                x = torch.cat([x, a2_t], dim=1)
                 x = F.relu(self.fc1(x))
 
-                x = torch.cat([x, a4_t], dim=1)
-                x = F.relu(self.fc2(x))
+                x = self.fc3(x)
 
-                logits = self.fc3(x)
-
-                if self.mode == 'MOL':
-                    sample = sample_from_discretized_mix_logistic(logits.unsqueeze(0).transpose(1, 2))
+                if self.mode == 'RAW':
+                    sample = sample_from_beta_dist(x.unsqueeze(0)).view(-1)
+                    output.append(sample)
+                    x = sample.unsqueeze(-1)
+                elif self.mode == 'MOL':
+                    sample = sample_from_discretized_mix_logistic(x.unsqueeze(0).transpose(1, 2))
                     output.append(sample.view(-1))
                     if torch.cuda.is_available():
-                        # x = torch.FloatTensor([[sample]]).cuda()
                         x = sample.transpose(0, 1).cuda()
                     else:
                         x = sample.transpose(0, 1)
-
-                elif self.mode == 'RAW' :
-                    posterior = F.softmax(logits, dim=1)
+                elif self.mode == 'BITS':
+                    posterior = F.softmax(x, dim=1)
                     distrib = torch.distributions.Categorical(posterior)
 
                     sample = 2 * distrib.sample().float() / (self.n_classes - 1.) - 1.
@@ -235,7 +228,7 @@ class WaveRNN(nn.Module):
         output = torch.stack(output).transpose(0, 1)
         output = output.cpu().numpy()
         output = output.astype(np.float64)
-        
+
         if batched:
             output = self.xfade_and_unfold(output, target, overlap)
         else:
@@ -250,7 +243,7 @@ class WaveRNN(nn.Module):
         fade_out = np.linspace(1, 0, 20 * self.hop_length)
         output = output[:wave_len]
         output[-20 * self.hop_length:] *= fade_out
-        
+
         self.train()
 
         return output

@@ -6,7 +6,7 @@ FROM python:3.8.12-bullseye
 ENV PYTHONUNBUFFERED True
 
 # Install build dependencies.
-RUN apt-get update -y && apt-get install -y --no-install-recommends build-essential gcc curl libsndfile1
+RUN apt-get update -y && apt-get install -y --no-install-recommends build-essential cmake libeigen3-dev gcc curl libsndfile1 zlib1g-dev
 
 # Setup venv for building all requirements and add it to path
 RUN python -m venv /opt/venv
@@ -32,3 +32,23 @@ RUN gcloud auth activate-service-account $STORAGE_ACCOUNT --key-file=storage-key
 # Get models from gcloud and bundle them in container -> Reduces initial spawn time of the container
 RUN mkdir -p /var/models
 RUN gsutil -m cp gs://$MODELS_BUCKET/* /var/models
+# COPY ./models/* /var/models/ # -> DEBUG CODE for local build; comment out all the google stuff
+
+# Build and install libwavernn
+RUN mkdir -p "/cpuvocoder/config"
+RUN mkdir -p "/cpuvocoder/vocoder"
+COPY ./config/ ./cpuvocoder/config
+COPY ./vocoder/ ./cpuvocoder/vocoder
+WORKDIR /cpuvocoder/vocoder/libwavernn
+RUN chmod +x ./build.sh
+RUN ./build.sh
+
+# Convert vocoder model into binary form
+WORKDIR /cpuvocoder
+RUN mv vocoder/vocoder_convert_model.py vocoder_convert_model.py
+RUN python vocoder_convert_model.py /var/models/vocoder.pt --default_model_type fatchord-wavernn --out_dir /var/models/
+
+# Drop fdir and Switch back to default workdir
+WORKDIR /
+RUN rm -rf ./cpuvocoder
+RUN ls -la /var/models

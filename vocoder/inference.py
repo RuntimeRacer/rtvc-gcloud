@@ -1,64 +1,100 @@
+from config.hparams import sp, wavernn_fatchord, wavernn_geneing, wavernn_runtimeracer
+from vocoder.models import base
+import vocoder.libwavernn.inference as libwavernn
 import torch
 
-from config.hparams import sp
-from config.hparams import wavernn as hp_wavernn
-from vocoder.models.fatchord_version import WaveRNN
+_model = None
+_model_type = None
 
-_model = None  # type: WaveRNN
 
-def load_model(weights_fpath, verbose=True):
-    global _model, _device
-    
-    if verbose:
-        print("Building Wave-RNN")
-    _model = WaveRNN(
-        rnn_dims=hp_wavernn.rnn_dims,
-        fc_dims=hp_wavernn.fc_dims,
-        bits=hp_wavernn.bits,
-        pad=hp_wavernn.pad,
-        upsample_factors=hp_wavernn.upsample_factors,
-        feat_dims=sp.num_mels,
-        compute_dims=hp_wavernn.compute_dims,
-        res_out_dims=hp_wavernn.res_out_dims,
-        res_blocks=hp_wavernn.res_blocks,
-        hop_length=sp.hop_size,
-        sample_rate=sp.sample_rate,
-        mode=hp_wavernn.mode
-    )
+def load_model(weights_fpath, voc_type=base.VOC_TYPE_PYTORCH, verbose=True):
+    global _model, _device, _model_type
 
-    if torch.cuda.is_available():
-        _model = _model.cuda()
-        _device = torch.device('cuda')
+    if voc_type == base.VOC_TYPE_PYTORCH:
+        if torch.cuda.is_available():
+            _device = torch.device('cuda')
+        else:
+            _device = torch.device('cpu')
+
+        # Load model weights from provided model path
+        checkpoint = torch.load(weights_fpath, map_location=_device)
+        _model_type = base.MODEL_TYPE_FATCHORD
+        if "model_type" in checkpoint:
+            _model_type = checkpoint["model_type"]
+
+        # Init the model
+        try:
+            _model, _ = base.init_voc_model(_model_type, _device)
+            _model = _model.eval()
+        except NotImplementedError as e:
+            print(str(e))
+            return
+
+        # Load model state
+        _model.load_state_dict(checkpoint["model_state"])
+
+        if verbose:
+            print("Loaded vocoder of model '%s' at path '%s'." % (_model_type, weights_fpath))
+            print("Model has been trained to step %d." % (_model.state_dict()["step"]))
+
+    elif voc_type == base.VOC_TYPE_CPP:
+        # FIXME: Vocoder type is hacky
+        _model = libwavernn.Vocoder(weights_fpath, 'runtimeracer-wavernn', verbose)
+        _model.load()
+        _model_type = voc_type
+        # FIXME: This works because there is only one CPP vocoder implementaion available, but _model_type has
+        # FIXME: different meaning depending on context.
+
+        if verbose:
+            print("Loaded vocoder of model '%s' at path '%s'." % (_model_type, weights_fpath))
+
     else:
-        _device = torch.device('cpu')
-    
-    if verbose:
-        print("Loading model weights at %s" % weights_fpath)
-    checkpoint = torch.load(weights_fpath, _device)
-    _model.load_state_dict(checkpoint['model_state'])
-    _model.eval()
+        raise NotImplementedError("Invalid vocoder of type '%s' provided. Aborting..." % voc_type)
 
 
 def is_loaded():
     return _model is not None
 
-
-def infer_waveform(mel, normalize=True,  batched=True, target=hp_wavernn.gen_target, overlap=hp_wavernn.gen_overlap):
+def infer_waveform(mel, normalize=True, batched=True, target=None, overlap=None):
     """
-    Infers the waveform of a mel spectrogram output by the synthesizer (the format must match 
+    Infers the waveform of a mel spectrogram output by the synthesizer (the format must match
     that of the synthesizer!)
-    
-    :param normalize:  
-    :param batched: 
-    :param target: 
-    :param overlap: 
-    :return: 
+
+    :param normalize:
+    :param batched:
+    :param target:
+    :param overlap:
+    :return:
     """
-    if _model is None:
+    if _model is None or _model_type is None:
         raise Exception("Please load Wave-RNN in memory before using it")
-    
-    if normalize:
-        mel = mel / sp.max_abs_value
-    mel = torch.from_numpy(mel[None, ...])
-    wav = _model.generate(mel, batched, target, overlap, hp_wavernn.mu_law, sp.preemphasize)
-    return wav
+
+    if _model_type == base.VOC_TYPE_CPP:
+        wav = _model.vocode_mel(mel=mel, normalize=normalize)
+        return wav
+    else:
+        if _model_type == base.MODEL_TYPE_FATCHORD:
+            hp_wavernn = wavernn_fatchord
+        elif _model_type == base.MODEL_TYPE_GENEING:
+            hp_wavernn = wavernn_geneing
+        elif _model_type == base.MODEL_TYPE_RUNTIMERACER:
+            hp_wavernn = wavernn_runtimeracer
+        else:
+            raise NotImplementedError("Invalid model of type '%s' provided. Aborting..." % _model_type)
+
+        if target is None:
+            target = hp_wavernn.gen_target
+        if overlap is None:
+            overlap = hp_wavernn.gen_overlap
+
+        if normalize:
+            mel = mel / sp.max_abs_value
+        mel = torch.from_numpy(mel[None, ...])
+        wav = _model.generate(mel, batched, target, overlap, hp_wavernn.mu_law, sp.preemphasize)
+        return wav
+
+def set_seed(seed):
+    if _model_type == base.VOC_TYPE_CPP:
+        _model.setRandomSeed(seed)
+    else:
+        torch.manual_seed(seed)

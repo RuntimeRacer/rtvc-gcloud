@@ -151,36 +151,64 @@ class Synthesizer:
             print("\n\nDone.\n")
         return (specs, alignments) if return_alignments else specs
 
-    @staticmethod
-    def load_preprocess_wav(wav):
-        """
-        Loads and preprocesses an audio file under the same conditions the audio files were used to
-        train the synthesizer. 
-        """
-        wav = librosa.load(io.BytesIO(wav), sr=sp.sample_rate)[0]
-        if preprocessing.rescale:
-            wav = wav / np.abs(wav).max() * preprocessing.rescaling_max
-        return wav
 
-    @staticmethod
-    def make_spectrogram(wav):
-        """
-        Creates a mel spectrogram from an audio file in the same manner as the mel spectrograms that 
-        were fed to the synthesizer when training.
-        """
-        wav = Synthesizer.load_preprocess_wav(wav)
-        
-        mel_spectrogram = audio.melspectrogram(wav).astype(np.float32)
-        return mel_spectrogram
-    
-    @staticmethod
-    def griffin_lim(mel):
-        """
-        Inverts a mel spectrogram using Griffin-Lim. The mel spectrogram is expected to have been built
-        with the same parameters present in hparams.py.
-        """
-        return audio.inv_mel_spectrogram(mel)
+_model = None # type: Synthesizer
 
+def load_model(weights_fpath, verbose=True):
+    global _model, _device, _model_type
+
+    if torch.cuda.is_available():
+        _device = torch.device('cuda')
+    else:
+        _device = torch.device('cpu')
+
+    # Load model weights from provided model path
+    _model = Synthesizer(weights_fpath, verbose)
+    _model.load()
+
+def is_loaded():
+    return _model is not None and _model.is_loaded()
+
+def get_model_type():
+    if not is_loaded():
+        raise Exception("Please load Synthesizer in memory before using it")
+    else:
+        return _model.get_model_type()
+
+def synthesize_spectrograms(texts: List[str], embeddings: Union[np.ndarray, List[np.ndarray]], return_alignments=False,
+                            speed_modifier=1.0, pitch_function=None, energy_function=None):
+    if not is_loaded():
+        raise Exception("Please load Synthesizer in memory before using it")
+    return _model.synthesize_spectrograms(texts=texts, embeddings=embeddings, return_alignments=return_alignments,
+                                          speed_modifier=speed_modifier, pitch_function=pitch_function,
+                                          energy_function=energy_function)
+
+def load_preprocess_wav(wav):
+    """
+    Loads and preprocesses an audio file under the same conditions the audio files were used to
+    train the synthesizer.
+    """
+    wav = librosa.load(io.BytesIO(wav), sr=sp.sample_rate)[0]
+    if preprocessing.rescale:
+        wav = wav / np.abs(wav).max() * preprocessing.rescaling_max
+    return wav
+
+def make_spectrogram(wav):
+    """
+    Creates a mel spectrogram from an audio file in the same manner as the mel spectrograms that
+    were fed to the synthesizer when training.
+    """
+    wav = load_preprocess_wav(wav)
+
+    mel_spectrogram = audio.melspectrogram(wav).astype(np.float32)
+    return mel_spectrogram
+
+def griffin_lim(mel):
+    """
+    Inverts a mel spectrogram using Griffin-Lim. The mel spectrogram is expected to have been built
+    with the same parameters present in hparams.py.
+    """
+    return audio.inv_mel_spectrogram(mel)
 
 def pad1d(x, max_len, pad_value=0):
     return np.pad(x, (0, max_len - len(x)), mode="constant", constant_values=pad_value)
