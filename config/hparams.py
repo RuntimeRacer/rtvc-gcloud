@@ -417,3 +417,144 @@ wavernn_runtimeracer = HParams(
     gen_target=6000,  # target number of samples to be generated in each batch entry
     gen_overlap=1000,  # number of samples for crossfading between batches
 )
+
+# Parameters for Multiband MelGAN
+multiband_melgan = HParams(
+    # Generator
+    generator_type="MelGANGenerator",
+    generator_in_channels=80,  # Number of input channels.
+    generator_out_channels=4,  # Number of output channels.
+    generator_kernel_size=7,  # Kernel size of initial and final conv layers.
+    generator_channels=384,  # Initial number of channels for conv layers.
+    generator_upsample_scales=[5, 5, 2],  # List of Upsampling scales.
+    generator_stack_kernel_size=3,  # Kernel size of dilated conv layers in residual stack.
+    generator_stacks=4,  # Number of stacks in a single residual stack module.
+    generator_use_weight_norm=True,  # Whether to use weight normalization.
+    generator_use_causal_conv=False,  # Whether to use causal convolution.
+
+    # Discriminator
+    discriminator_type="MelGANMultiScaleDiscriminator",
+    discriminator_in_channels=1,  # Number of input channels.
+    discriminator_out_channels=1,  # Number of output channels.
+    discriminator_scales=3,  # Number of multi-scales.
+    discriminator_downsample_pooling="AvgPool1d",  # Pooling type for the input downsampling.
+    discriminator_downsample_pooling_params={  # Parameters of the above pooling function.
+        "kernel_size": 4,
+        "stride": 2,
+        "padding": 1,
+        "count_include_pad": False,
+    },
+    discriminator_kernel_sizes=[5, 3],  # List of kernel size.
+    discriminator_channels=16,  # Number of channels of the initial conv layer.
+    discriminator_max_downsample_channels=512,  # Maximum number of channels of downsampling layers.
+    discriminator_downsample_scales=[4, 4, 4],  # List of downsampling scales.
+    discriminator_nonlinear_activation="LeakyReLU",  # Nonlinear activation function.
+    discriminator_nonlinear_activation_params={"negative_slope": 0.2},  # Parameters of nonlinear activation function.
+    discriminator_use_weight_norm=True,  # Whether to use weight norm.
+
+    # STFT Loss settings
+    # DEFAULT VALUES for 16-khz vocode
+    use_stft_loss=True,
+    stft_loss_params={
+        "fft_sizes": [512, 1024, 256],  # List of FFT size for STFT-based loss.
+        "hop_sizes": [60, 120, 25],  # List of hop size for STFT-based loss
+        "win_lengths": [300, 600, 120],  # List of window length for STFT-based loss.
+        "window": "hann_window",  # Window function for STFT-based loss
+    },
+    use_subband_stft_loss=True,
+    subband_stft_loss_params={
+        "fft_sizes": [192, 342, 86],  # List of FFT size for STFT-based loss.
+        "hop_sizes": [15, 30, 5],  # List of hop size for STFT-based loss
+        "win_lengths": [75, 150, 30],  # List of window length for STFT-based loss.
+        "window": "hann_window",  # Window function for STFT-based loss
+    },
+
+    # DEFAULT VALUES for 24-khz vocode
+    # use_stft_loss=True,
+    # stft_loss_params={
+    #     "fft_sizes": [1024, 2048, 512],  # List of FFT size for STFT-based loss.
+    #     "hop_sizes": [120, 240, 50],  # List of hop size for STFT-based loss
+    #     "win_lengths": [600, 1200, 240],  # List of window length for STFT-based loss.
+    #     "window": "hann_window",  # Window function for STFT-based loss
+    # },
+    # use_subband_stft_loss=True,
+    # subband_stft_loss_params={
+    #     "fft_sizes": [384, 683, 171],  # List of FFT size for STFT-based loss.
+    #     "hop_sizes": [30, 60, 10],  # List of hop size for STFT-based loss
+    #     "win_lengths": [150, 300, 60],  # List of window length for STFT-based loss.
+    #     "window": "hann_window",  # Window function for STFT-based loss
+    # },
+
+    # Adversarial Loss Setting
+    use_feat_match_loss=False,  # Whether to use feature matching loss.
+    lambda_adv=2.5,  # Loss balancing coefficient for adversarial loss.
+
+    # Training Settings
+    batch_size=64, # Size of the batches used for training.
+    aux_context_window=0,  # this will pad the input so that the resnet can 'see' wider than input length
+    seq_len=sp.hop_size * 40,  # Batch max steps (8000) - must be a multiple of hop_length
+    # seq_len can be adjusted to increase training sequence length (will increase GPU usage)
+    remove_short_samples=True,  # Whether to remove samples the length of which are less than batch_max_steps.
+
+    ##################################################
+    # Progressive training schedules
+    ##################################################
+    # (loops, init_lr, final_lr, batch_size)
+    # loops = amount of loops through the dataset per epoch
+    # init_lr = inital sgdr learning rate
+    # final_lr = amount of loops through the dataset per epoch
+    ##################################################
+
+    # Generator Training Settings
+    generator_train_start_after_steps=0,  # Generator Training will start once generator reached this step
+    generator_optimizer_type="Adam",
+    generator_optimizer_params={
+        "eps": 1e-7,
+        "weight_decay": 0.0,
+        "amsgrad": True
+    },
+    generator_grad_norm=-1,
+    generator_scheduler_type="MultiStepLR",
+    generator_tts_schedule=[
+        (1, 1e-3, 1e-3),
+        (2, 1e-3, 5e-4),
+        (4, 5e-4, 5e-4),
+        (8, 5e-4, 1e-4),
+        (16, 1e-4, 1e-4),
+        (32, 1e-4, 5e-5),
+        (64, 5e-5, 5e-5),
+        (128, 5e-5, 5e-5),
+        (256, 5e-5, 5e-5),
+        (256, 5e-5, 5e-5),
+        (256, 5e-5, 5e-5),
+        (256, 5e-5, 5e-5),
+    ],
+
+    # Discriminator Training Settings
+    discriminator_train_start_after_steps=200000,  # Discriminator Training will start once generator reached this step
+    discriminator_optimizer_type="Adam",
+    discriminator_optimizer_params={
+        "eps": 1e-7,
+        "weight_decay": 0.0,
+        "amsgrad": True
+    },
+    discriminator_grad_norm=-1,
+    discriminator_scheduler_type="MultiStepLR",
+    discriminator_tts_schedule=[
+        (1, 1e-3, 1e-3),
+        (2, 1e-3, 5e-4),
+        (4, 5e-4, 5e-4),
+        (8, 5e-4, 1e-4),
+        (16, 1e-4, 1e-4),
+        (32, 1e-4, 5e-5),
+        (64, 5e-5, 5e-5),
+        (128, 5e-5, 5e-5),
+        (256, 5e-5, 5e-5),
+        (256, 5e-5, 5e-5),
+        (256, 5e-5, 5e-5),
+        (256, 5e-5, 5e-5),
+    ],
+
+    # Generating / Synthesizing
+    gen_at_checkpoint=5,  # number of samples to generate at each checkpoint
+)

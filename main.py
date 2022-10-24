@@ -10,7 +10,6 @@ import base64
 import logging
 import torch
 import numpy as np
-import noisereduce as nr
 import soundfile as sf
 
 from time import perf_counter as timer
@@ -21,8 +20,7 @@ from encoder import inference as encoder
 from encoder.audio import preprocess_wav
 from synthesizer.models import base as syn_base
 from synthesizer import inference as synthesizer
-from vocoder.models import base as voc_base
-from vocoder import inference as vocoder
+from vocoder import inference as vocoder, base as voc_base
 
 # Cloud Function related stuff
 app = flask.Flask(__name__)

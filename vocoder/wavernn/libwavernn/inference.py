@@ -3,7 +3,7 @@ import math
 from concurrent.futures import ThreadPoolExecutor
 
 from config.hparams import sp, wavernn_fatchord, wavernn_geneing, wavernn_runtimeracer
-from vocoder.models import base
+from vocoder import base
 from vocoder.audio import decode_mu_law, de_emphasis
 from pathlib import Path
 import numpy as np

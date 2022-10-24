@@ -6,7 +6,7 @@ import struct
 import numpy as np
 import scipy as sp
 
-from vocoder.models import base
+from vocoder import base
 from config.hparams import wavernn_fatchord, wavernn_geneing, wavernn_runtimeracer
 
 elSize = 4 #change to 2 for fp16
