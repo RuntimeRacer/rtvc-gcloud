@@ -34,3 +34,4 @@ psutil
 noisereduce
 h5py
 filelock
+yaml
