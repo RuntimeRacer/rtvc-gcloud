@@ -287,7 +287,7 @@ def do_vocode(syn_mel, syn_breaks):
 
     # Encode as WAV
     with io.BytesIO() as handle:
-        sf.write(handle, wav.astype(np.float32), samplerate=sp.sample_rate, format='wav')
+        sf.write(handle, wav, samplerate=sp.sample_rate, format='wav')
         wav_string = handle.getvalue()
     return wav_string
 
