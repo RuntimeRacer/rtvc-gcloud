@@ -145,6 +145,7 @@ def process_synthesize_request(request_data):
         embed = base64.b64decode(embed.encode('utf-8'))
         embed = json.loads(embed)
         embed = np.array(embed, dtype=np.float32)
+        embed = embed.copy(order='F')
         #embed = np.frombuffer(embed, dtype=np.float32)
         text = base64.decodebytes(text.encode('utf-8')).decode('utf-8')
     except Exception as e:
