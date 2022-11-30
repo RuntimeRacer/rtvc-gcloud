@@ -105,8 +105,12 @@ def process_encode_request(request_data):
     embed = encoder.embed_utterance(encoder_wav)
 
     # Build response
+
+    embed_json = embed.copy(order='C')  # Make C-Contigous to allow encoding
+    embed_json = json.dumps(embed_json.tolist())
+
     response = {
-        "embed": base64.b64encode(embed).decode('utf-8'),
+        "embed": base64.b64encode(embed_json.encode('utf-8')).decode('utf-8'),
         "embed_graph": render.embedding(embed),
         "embed_mel_graph": render.spectogram(spectogram)
     }
@@ -139,7 +143,9 @@ def process_synthesize_request(request_data):
     # Decode input from base64
     try:
         embed = base64.b64decode(embed.encode('utf-8'))
-        embed = np.frombuffer(embed, dtype=np.float32)
+        embed = json.loads(embed)
+        embed = np.array(embed, dtype=np.float32)
+        #embed = np.frombuffer(embed, dtype=np.float32)
         text = base64.decodebytes(text.encode('utf-8')).decode('utf-8')
     except Exception as e:
         logging.log(logging.ERROR, e)
@@ -167,7 +173,7 @@ def process_synthesize_request(request_data):
 
     # Build response
     breaks_json = json.dumps(breaks)
-    full_spectogram_json = full_spectogram.copy(order='C')  # Make C-Contigous to allow encoding - might need to be reverted for vocoding
+    full_spectogram_json = full_spectogram.copy(order='C')  # Make C-Contigous to allow encoding
     full_spectogram_json = json.dumps(full_spectogram_json.tolist())
 
     response = {
@@ -362,6 +368,8 @@ def load_encoder():
             return True
         else:
             return False
+    else:
+        return True
 
 # load_synthesizer loads the synthesizer into memory
 def load_synthesizer():
