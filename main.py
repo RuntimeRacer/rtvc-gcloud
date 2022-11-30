@@ -105,12 +105,8 @@ def process_encode_request(request_data):
     embed = encoder.embed_utterance(encoder_wav)
 
     # Build response
-
-    embed_json = embed.copy(order='C')  # Make C-Contigous to allow encoding
-    embed_json = json.dumps(embed_json.tolist())
-
     response = {
-        "embed": base64.b64encode(embed_json.encode('utf-8')).decode('utf-8'),
+        "embed": base64.b64encode(embed).decode('utf-8'),
         "embed_graph": render.embedding(embed),
         "embed_mel_graph": render.spectogram(spectogram)
     }
@@ -143,14 +139,15 @@ def process_synthesize_request(request_data):
     # Decode input from base64
     try:
         embed = base64.b64decode(embed.encode('utf-8'))
-        embed = json.loads(embed)
-        embed = np.array(embed, dtype=np.float32)
-        embed = embed.copy(order='F')
-        #embed = np.frombuffer(embed, dtype=np.float32)
+        embed = np.frombuffer(embed, dtype=np.float32)
         text = base64.decodebytes(text.encode('utf-8')).decode('utf-8')
     except Exception as e:
         logging.log(logging.ERROR, e)
         return "invalid embedding or text provided", 400
+
+    # Load the model
+    if not load_synthesizer():
+        return "synthesizer model not found", 500
 
     # Apply seed
     if seed is None:
@@ -164,10 +161,6 @@ def process_synthesize_request(request_data):
             logging.log(logging.ERROR, e)
             return "invalid generation seed provided", 400
     logging.log(logging.INFO, "Using seed: %d" % seed)
-
-    # Load the model
-    if not load_synthesizer():
-        return "synthesizer model not found", 500
 
     # Perform the synthesis
     full_spectogram, breaks = do_synthesis(text, embed, speed_modifier, pitch_modifier, energy_modifier)
@@ -189,7 +182,10 @@ def process_synthesize_request(request_data):
 
 def do_synthesis(text, embed, speed_modifier, pitch_modifier, energy_modifier):
     # Process multiline text as individual synthesis => Maybe Possibility for threaded speedup here
-    texts = text.split("\n")
+    if synthesizer.get_model_type() == syn_base.MODEL_TYPE_TACOTRON:
+        texts = text.split("\n")
+    elif synthesizer.get_model_type() == syn_base.MODEL_TYPE_FORWARD_TACOTRON:
+        texts = [text]
     embeds = [embed] * len(texts)
 
     # Params for advanced model
@@ -284,7 +280,7 @@ def do_vocode(syn_mel, syn_breaks):
     wav = np.concatenate([i for w, b in zip(wavs, syn_breaks) for i in (w, b)])
 
     # Apply optimizations
-    wav = preprocess_wav(wav)  # Trim silences
+    #wav = preprocess_wav(wav)  # Trim silences
     #wav = nr.reduce_noise(y=wav, sr=sp.sample_rate, stationary=False, n_fft=sp.n_fft, hop_length=sp.hop_size,
     #                      win_length=sp.win_size, n_jobs=-1)
     wav = wav / np.abs(wav).max() * 0.97  # Normalize
