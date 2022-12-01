@@ -108,7 +108,6 @@ def process_encode_request(request_data):
     os.environ["PYTHONHASHSEED"] = "111"
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    torch.set_num_threads(1)
 
     # process wav and generate embedding
     encoder_wav = preprocess_wav(wav)
@@ -172,7 +171,6 @@ def process_synthesize_request(request_data):
     os.environ["PYTHONHASHSEED"] = str(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    torch.set_num_threads(1)
 
     # Perform the synthesis
     full_spectogram, breaks = do_synthesis(text, embed, speed_modifier, pitch_modifier, energy_modifier)
@@ -270,7 +268,6 @@ def process_vocode_request(request_data):
     os.environ["PYTHONHASHSEED"] = str(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    torch.set_num_threads(1)
 
     # Perform the vocoding
     wav_string = do_vocode(syn_mel, syn_breaks)
