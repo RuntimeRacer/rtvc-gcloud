@@ -162,6 +162,8 @@ def process_synthesize_request(request_data):
     # Apply seed
     if seed is None:
         seed = random.randint(0, 4294967295)
+    else:
+        seed = int(seed)
     logging.log(logging.INFO, "Using seed: %d" % seed)
 
     # Ensure everything is properly set up
@@ -258,6 +260,8 @@ def process_vocode_request(request_data):
     # Apply seed
     if seed is None:
         seed = random.randint(0, 4294967295)
+    else:
+        seed = int(seed)
     logging.log(logging.INFO, "Using seed: %d" % seed)
 
     # Ensure everything is properly set up
