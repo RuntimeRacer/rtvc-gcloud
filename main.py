@@ -93,8 +93,6 @@ def process_encode_request(request_data):
     try:
         # Decode the wav from payload
         wav = base64.b64decode(wav)
-        wav_md5 = hashlib.md5(wav)
-        print("MD5 Checks - Wav: {0}".format(wav_md5.hexdigest()))
         # Generate the spectogram
         spectogram = synthesizer.make_spectrogram(wav)
     except Exception as e:
@@ -113,7 +111,8 @@ def process_encode_request(request_data):
         return "encoder model not found", 500
 
     # process wav and generate embedding
-    encoder_wav = preprocess_wav(wav)
+    prep_wav = synthesizer.load_preprocess_wav(wav)
+    encoder_wav = preprocess_wav(prep_wav)
     embed = encoder.embed_utterance(encoder_wav)
 
     # Check embedding generation using MD5

@@ -1,3 +1,4 @@
+import hashlib
 import io
 from pathlib import Path
 from typing import List, Union
@@ -189,8 +190,14 @@ def load_preprocess_wav(wav):
     train the synthesizer.
     """
     wav = librosa.load(io.BytesIO(wav), sr=sp.sample_rate)[0]
+    wav_md5 = hashlib.md5(wav)
+    print("MD5 Checks - Wav: {0}".format(wav_md5.hexdigest()))
+
     if preprocessing.rescale:
         wav = wav / np.abs(wav).max() * preprocessing.rescaling_max
+
+    prep_wav_md5 = hashlib.md5(wav)
+    print("MD5 Checks - Preprocessed Wav: {0}".format(prep_wav_md5.hexdigest()))
     return wav
 
 def make_spectrogram(wav):
