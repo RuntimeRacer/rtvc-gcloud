@@ -1,3 +1,4 @@
+import hashlib
 import io
 import os
 import pathlib
@@ -92,6 +93,8 @@ def process_encode_request(request_data):
     try:
         # Decode the wav from payload
         wav = base64.b64decode(wav)
+        wav_md5 = hashlib.md5(wav)
+        print("MD5 Checks - Wav: {0}".format(wav_md5.hexdigest()))
         # Generate the spectogram
         spectogram = synthesizer.make_spectrogram(wav)
     except Exception as e:
@@ -112,6 +115,11 @@ def process_encode_request(request_data):
     # process wav and generate embedding
     encoder_wav = preprocess_wav(wav)
     embed = encoder.embed_utterance(encoder_wav)
+
+    # Check embedding generation using MD5
+    encoder_wav_md5 = hashlib.md5(encoder_wav)
+    embed_md5 = hashlib.md5(embed)
+    print("MD5 Checks - Encoded Wav: {0} Embed: {1}".format(encoder_wav_md5.hexdigest(), embed_md5.hexdigest()))
 
     # Build response
     response = {
