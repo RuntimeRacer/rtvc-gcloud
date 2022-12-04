@@ -98,16 +98,16 @@ def process_encode_request(request_data):
         logging.log(logging.ERROR, e)
         return "invalid speaker wav provided", 400
 
-    # Load the model
-    if not load_encoder():
-        return "encoder model not found", 500
-
     # Set Default Encoder Seed to 111
     torch.manual_seed(111)
     np.random.seed(111)
     os.environ["PYTHONHASHSEED"] = "111"
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+    # Load the model
+    if not load_encoder():
+        return "encoder model not found", 500
 
     # process wav and generate embedding
     encoder_wav = preprocess_wav(wav)
@@ -154,10 +154,6 @@ def process_synthesize_request(request_data):
         logging.log(logging.ERROR, e)
         return "invalid embedding or text provided", 400
 
-    # Load the model
-    if not load_synthesizer():
-        return "synthesizer model not found", 500
-
     # Apply seed
     if seed is None:
         seed = random.randint(0, 4294967295)
@@ -171,6 +167,10 @@ def process_synthesize_request(request_data):
     os.environ["PYTHONHASHSEED"] = str(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+    # Load the model
+    if not load_synthesizer():
+        return "synthesizer model not found", 500
 
     # Perform the synthesis
     full_spectogram, breaks = do_synthesis(text, embed, speed_modifier, pitch_modifier, energy_modifier)
@@ -251,10 +251,6 @@ def process_vocode_request(request_data):
         logging.log(logging.ERROR, e)
         return "invalid synthesis data provided", 400
 
-    # Load the model
-    if not load_vocoder():
-        return "vocoder model not found", 500
-
     # Apply seed
     if seed is None:
         seed = random.randint(0, 4294967295)
@@ -263,11 +259,15 @@ def process_vocode_request(request_data):
     logging.log(logging.INFO, "Using seed: %d" % seed)
 
     # Ensure everything is properly set up
-    torch.manual_seed(seed)
+    vocoder.set_seed(seed)
     np.random.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+    # Load the model
+    if not load_vocoder():
+        return "vocoder model not found", 500
 
     # Perform the vocoding
     wav_string = do_vocode(syn_mel, syn_breaks)

@@ -5,14 +5,18 @@ import torch
 
 from vocoder.parallel_wavegan.layers import PQMF
 
+_seed = -1
 _model = None
 _model_type = None
 
 
 def load_model(weights_fpath, voc_type=base.VOC_TYPE_PYTORCH, verbose=True):
-    global _model, _device, _model_type
+    global _model, _device, _model_type, _seed
 
     if voc_type == base.VOC_TYPE_PYTORCH:
+        if _seed >= 0:
+            torch.manual_seed(_seed)
+
         if torch.cuda.is_available():
             _device = torch.device('cuda')
         else:
@@ -51,6 +55,8 @@ def load_model(weights_fpath, voc_type=base.VOC_TYPE_PYTORCH, verbose=True):
         _model = libwavernn.Vocoder(weights_fpath, 'runtimeracer-wavernn', verbose)
         _model.load()
         _model_type = voc_type
+        if _seed >= 0:
+            _model.setRandomSeed(_seed)
         # FIXME: This works because there is only one CPP vocoder implementaion available, but _model_type has
         # FIXME: different meaning depending on context.
 
@@ -119,8 +125,7 @@ def infer_waveform(mel, normalize=True, batched=True, target=None, overlap=None)
             return wav
 
 
+# set_seed; basically only needed for CPP vocoder, otherwise will init from torch seed.
 def set_seed(seed):
-    if is_loaded() and _model_type == base.VOC_TYPE_CPP:
-        _model.setRandomSeed(seed)
-    else:
-        torch.manual_seed(seed)
+    global _seed
+    _seed = seed
