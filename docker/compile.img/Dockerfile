@@ -6,7 +6,7 @@ FROM python:3.8.12-bullseye
 ENV PYTHONUNBUFFERED True
 
 # Install build dependencies.
-RUN apt-get update -y && apt-get install -y --no-install-recommends build-essential cmake libeigen3-dev gcc curl libsndfile1 zlib1g-dev
+RUN apt-get update -y && apt-get install -y --no-install-recommends build-essential cmake libeigen3-dev gcc curl libsndfile1 zlib1g-dev ffmpeg
 
 # Setup venv for building all requirements and add it to path
 RUN python -m venv /opt/venv
