@@ -20,6 +20,7 @@ def spectogram(spectogram):
 
     buffer = io.BytesIO()
     fig.savefig(buffer, format='png')
+    plt.close(fig)
     buffer.seek(0)
     spectogram_bytes = buffer.getvalue()
     img_str = "data:image/png;base64," + base64.b64encode(spectogram_bytes).decode()
@@ -40,6 +41,7 @@ def embedding(embed):
 
     buffer = io.BytesIO()
     fig.savefig(buffer, format='png')
+    plt.close(fig)
     buffer.seek(0)
     spectogram_bytes = buffer.getvalue()
     img_str = "data:image/png;base64," + base64.b64encode(spectogram_bytes).decode()

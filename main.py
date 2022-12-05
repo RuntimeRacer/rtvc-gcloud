@@ -3,6 +3,8 @@ import io
 import os
 import pathlib
 import random
+import tempfile
+import ffmpeg
 
 import const
 import render
@@ -84,15 +86,38 @@ def handle_request():
 # - mel spectogram graph generated from input wav
 def process_encode_request(request_data):
     # Gather data from request
-    wav = request_data["speaker_wav"] if "speaker_wav" in request_data else None
+    audio = request_data["speaker_audio"] if "speaker_audio" in request_data else None
 
-    if wav is None:
-        return "no speaker wav provided", 400
+    if audio is None:
+        return "no speaker audio provided", 400
 
     # Generate the spectogram - if this fails, audio data provided is invalid
     try:
-        # Decode the wav from payload
-        wav = base64.b64decode(wav)
+        # Decode the audio from payload
+        audio = base64.b64decode(audio)
+
+        # Save to temp file and convert to waveform using FFMPEG
+        temp_audio = tempfile.NamedTemporaryFile(suffix='.audio', delete=False)
+        temp_wav = tempfile.NamedTemporaryFile(suffix='.wav', prefix=os.path.basename(temp_audio.name), delete=False)
+        try:
+            # Write Audio bytes to file and close it as well as the target file, so ffmpeg can write to it
+            temp_audio.write(io.BytesIO(audio).getbuffer())
+            temp_audio.close()
+            temp_wav.close()
+
+            # Conversion using ffmpeg
+            ffmpeg.input(temp_audio.name).output(temp_wav.name).run(overwrite_output=True)
+
+            # Read in using BytesIO
+            with open(temp_wav.name, 'rb') as handle:
+                wav = io.BytesIO(handle.read()).getvalue()
+        except Exception as e:
+            logging.log(logging.ERROR, e)
+        finally:
+            # Delete the temp files
+            os.unlink(temp_audio.name)
+            os.unlink(temp_wav.name)
+
         # Generate the spectogram
         spectogram = synthesizer.make_spectrogram(wav)
     except Exception as e:
