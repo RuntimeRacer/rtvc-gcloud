@@ -349,6 +349,7 @@ def process_render_request(request_data):
     speed_modifier = request_data["speed_modifier"] if "speed_modifier" in request_data else None
     pitch_modifier = request_data["pitch_modifier"] if "pitch_modifier" in request_data else None
     energy_modifier = request_data["energy_modifier"] if "energy_modifier" in request_data else None
+    render_graph = request_data["render_graph"] if "render_graph" in request_data else False
 
     # Check input
     if embed is None:
@@ -390,9 +391,13 @@ def process_render_request(request_data):
     # Perform the vocoding
     wav_string = do_vocode(syn_mel, syn_breaks)
 
+    if render_graph:
+        spectogram = synthesizer.make_spectrogram(wav_string)
+
     # Build response
     response = {
-        "generated_wav": base64.b64encode(wav_string).decode('utf-8')
+        "generated_wav": base64.b64encode(wav_string).decode('utf-8'),
+        "rendered_mel_graph": render.spectogram(spectogram) if render_graph else ''
     }
 
     return response, 200
