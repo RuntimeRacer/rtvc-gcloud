@@ -30,18 +30,6 @@ from synthesizer import inference as synthesizer
 from vocoder import inference as vocoder, base as voc_base
 from voicefixer import base as vf
 
-# preload_models loads all models into memory on app startup (if flag is set)
-def preload_models():
-    load_encoder()
-    load_synthesizer()
-    load_vocoder()
-    load_voicefixer()
-
-
-# Preload Models if flag is set
-if os.environ.get("PRELOAD") != "":
-    preload_models()
-
 
 # Cloud Run related stuff
 app = flask.Flask(__name__)
@@ -546,6 +534,20 @@ def get_version(request=None):
         }
     return response, 200
 
+
+# preload_models loads all models into memory on app startup (if flag is set)
+def preload_models():
+    load_encoder()
+    load_synthesizer()
+    load_vocoder()
+    load_voicefixer()
+
+
+# Preload Models if flag is set
+if os.environ.get("PRELOAD") != "":
+    preload_models()
+
+# Init Main process
 if __name__ == "__main__":
     if os.environ.get("PROFILE_MEMORY") != "":
         tracemalloc.start()
