@@ -1,3 +1,5 @@
+import tracemalloc
+
 import hashlib
 import io
 import os
@@ -41,6 +43,7 @@ CORS(app)
 @app.route("/synthesize", methods=['GET', 'POST'])
 @app.route("/vocode", methods=['GET', 'POST'])
 @app.route("/render", methods=['GET', 'POST'])
+@app.route("/profile", methods=['GET', 'POST'])
 def handle_request():
     # Evaluate request
     request = flask.request
@@ -73,6 +76,9 @@ def handle_request():
         return flask.make_response(response, code)
     if 'render' in request.path:
         response, code = process_render_request(request_data)
+        return flask.make_response(response, code)
+    if 'profile' in request.path:
+        response, code = process_profile_request(request_data)
         return flask.make_response(response, code)
     else:
         response, code = get_version(request)
@@ -428,6 +434,22 @@ def process_render_request(request_data):
 
     return response, 200
 
+
+def process_profile_request(request_data):
+    if os.environ.get("PROFILE_MEMORY") == "":
+        return "profiling is currently disabled", 400
+
+    # Get Memory Snapshot
+    snapshot = tracemalloc.take_snapshot()
+    top_stats = snapshot.statistics("lineno")
+
+    # Build response
+    stats_list = [str(stat) for stat in top_stats]
+    response = json.dumps(stats_list)
+
+    return response, 200
+
+
 # load_encoder loads the encoder into memory
 def load_encoder():
     if not encoder.is_loaded():
@@ -519,6 +541,9 @@ def preload_models():
     load_voicefixer()
 
 if __name__ == "__main__":
+    if os.environ.get("PROFILE_MEMORY") != "":
+        tracemalloc.start()
+
     # Preload Models if flag is set
     if os.environ.get("PRELOAD") != "":
         preload_models()
