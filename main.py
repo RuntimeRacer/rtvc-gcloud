@@ -30,7 +30,20 @@ from synthesizer import inference as synthesizer
 from vocoder import inference as vocoder, base as voc_base
 from voicefixer import base as vf
 
-# Cloud Function related stuff
+# preload_models loads all models into memory on app startup (if flag is set)
+def preload_models():
+    load_encoder()
+    load_synthesizer()
+    load_vocoder()
+    load_voicefixer()
+
+
+# Preload Models if flag is set
+if os.environ.get("PRELOAD") != "":
+    preload_models()
+
+
+# Cloud Run related stuff
 app = flask.Flask(__name__)
 CORS(app)
 
@@ -533,20 +546,9 @@ def get_version(request=None):
         }
     return response, 200
 
-# preload_models loads all models into memory on app startup (if flag is set)
-def preload_models():
-    load_encoder()
-    load_synthesizer()
-    load_vocoder()
-    load_voicefixer()
-
 if __name__ == "__main__":
     if os.environ.get("PROFILE_MEMORY") != "":
         tracemalloc.start()
-
-    # Preload Models if flag is set
-    if os.environ.get("PRELOAD") != "":
-        preload_models()
 
     # Run the webserver for handling requests - see also:
     # https://stackoverflow.com/questions/51025893/flask-at-first-run-do-not-use-the-development-server-in-a-production-environmen

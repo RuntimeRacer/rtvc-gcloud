@@ -163,10 +163,12 @@ def load_model(analysis_model_path="", synthesis_model_path="", verbose=True):
 
 
 def restore(input, output, cuda=False, mode=0, your_vocoder_func=None):
+    global _model
     if not is_loaded():
         raise RuntimeError("Error: VoiceFixer not loaded.")
     return _model.restore(input, output, cuda, mode, your_vocoder_func)
 
 
 def is_loaded():
+    global _model
     return _model is not None
