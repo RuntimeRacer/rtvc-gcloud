@@ -46,7 +46,7 @@ def handle_request():
     request = flask.request
 
     # Token Auth
-    if check_token_auth(request.headers.get('api-key')) is False:
+    if check_token_auth(request.headers.get('Api-Key')) is False:
         response = {
             "error": "invalid client token provided"
         }
