@@ -39,3 +39,4 @@ noisereduce
 h5py
 filelock
 pyyaml
+waitress
