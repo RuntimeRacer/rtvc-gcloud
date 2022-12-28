@@ -556,4 +556,4 @@ if __name__ == "__main__":
     # https://stackoverflow.com/questions/51025893/flask-at-first-run-do-not-use-the-development-server-in-a-production-environmen
     from waitress import serve
     # app.run(debug=False, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
-    serve(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+    serve(app, host="0.0.0.0", threads=int(os.environ.get("WORKER_THREADS", 4)), port=int(os.environ.get("PORT", 8080)))
