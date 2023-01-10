@@ -168,9 +168,11 @@ def load_model(weights_fpath, verbose=True):
     _model.load()
 
 def is_loaded():
+    global _model
     return _model is not None and _model.is_loaded()
 
 def get_model_type():
+    global _model
     if not is_loaded():
         raise Exception("Please load Synthesizer in memory before using it")
     else:
@@ -178,6 +180,7 @@ def get_model_type():
 
 def synthesize_spectrograms(texts: List[str], embeddings: Union[np.ndarray, List[np.ndarray]], return_alignments=False,
                             speed_modifier=1.0, pitch_function=None, energy_function=None):
+    global _model
     if not is_loaded():
         raise Exception("Please load Synthesizer in memory before using it")
     return _model.synthesize_spectrograms(texts=texts, embeddings=embeddings, return_alignments=return_alignments,

@@ -68,6 +68,7 @@ def load_model(weights_fpath, voc_type=base.VOC_TYPE_PYTORCH, verbose=True):
 
 
 def is_loaded():
+    global _model
     return _model is not None
 
 
@@ -82,6 +83,7 @@ def infer_waveform(mel, normalize=True, batched=True, target=None, overlap=None)
     :param overlap:
     :return:
     """
+    global _model
     if _model is None or _model_type is None:
         raise Exception("Please load Wave-RNN in memory before using it")
 

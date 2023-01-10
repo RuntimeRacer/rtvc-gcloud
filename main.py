@@ -1,3 +1,5 @@
+import tracemalloc
+
 import hashlib
 import io
 import os
@@ -26,8 +28,10 @@ from encoder.audio import preprocess_wav
 from synthesizer.models import base as syn_base
 from synthesizer import inference as synthesizer
 from vocoder import inference as vocoder, base as voc_base
+from voicefixer import base as vf
 
-# Cloud Function related stuff
+
+# Cloud Run related stuff
 app = flask.Flask(__name__)
 CORS(app)
 
@@ -40,12 +44,13 @@ CORS(app)
 @app.route("/synthesize", methods=['GET', 'POST'])
 @app.route("/vocode", methods=['GET', 'POST'])
 @app.route("/render", methods=['GET', 'POST'])
+@app.route("/profile", methods=['GET', 'POST'])
 def handle_request():
     # Evaluate request
     request = flask.request
 
     # Token Auth
-    if check_token_auth(request.headers.get('api-key')) is False:
+    if check_token_auth(request.headers.get('Api-Key')) is False:
         response = {
             "error": "invalid client token provided"
         }
@@ -73,6 +78,9 @@ def handle_request():
     if 'render' in request.path:
         response, code = process_render_request(request_data)
         return flask.make_response(response, code)
+    if 'profile' in request.path:
+        response, code = process_profile_request(request_data)
+        return flask.make_response(response, code)
     else:
         response, code = get_version(request)
         return flask.make_response(response, code)
@@ -87,6 +95,7 @@ def handle_request():
 def process_encode_request(request_data):
     # Gather data from request
     audio = request_data["speaker_audio"] if "speaker_audio" in request_data else None
+    enhance_audio = True if "enhance_audio" in request_data and request_data["enhance_audio"] == 1 else False
 
     if audio is None:
         return "no speaker audio provided", 400
@@ -97,19 +106,42 @@ def process_encode_request(request_data):
         audio = base64.b64decode(audio)
 
         # Save to temp file and convert to waveform using FFMPEG
+        # Also create the file for the enhancement here, even though we might not need it.
         temp_audio = tempfile.NamedTemporaryFile(suffix='.audio', delete=False)
         temp_wav = tempfile.NamedTemporaryFile(suffix='.wav', prefix=os.path.basename(temp_audio.name), delete=False)
+        temp_wav_enh = tempfile.NamedTemporaryFile(suffix='.wav', prefix=os.path.basename(temp_audio.name).join('_enhanced'), delete=False)
         try:
             # Write Audio bytes to file and close it as well as the target file, so ffmpeg can write to it
             temp_audio.write(io.BytesIO(audio).getbuffer())
             temp_audio.close()
             temp_wav.close()
+            temp_wav_enh.close()
+
+            # Check if audio file is valid and not too long
+            duration = float(ffmpeg.probe(temp_audio.name)["format"]["duration"])
+            if duration > const.INPUT_MAX_LENGTH_SECONDS or duration < const.INPUT_MIN_LENGTH_SECONDS:
+                return "input audio needs to have a duration between 0.5 of 15 seconds", 400
 
             # Conversion using ffmpeg
             ffmpeg.input(temp_audio.name).output(temp_wav.name).run(overwrite_output=True)
+            input_audio_file = temp_wav.name
+
+            # Enhance Audio using voicefixer
+            if enhance_audio:
+                try:
+                    # Load the model
+                    if not load_voicefixer():
+                        return "voicefixer models not found", 500
+                    # Enhance the audio
+                    vf.restore(input=temp_wav.name, output=temp_wav_enh.name)
+                    # Use enhanced file as encoder reference file
+                    input_audio_file = temp_wav_enh.name
+                except RuntimeError as e:
+                    logging.log(logging.ERROR, e)
+                    pass
 
             # Read in using BytesIO
-            with open(temp_wav.name, 'rb') as handle:
+            with open(input_audio_file, 'rb') as handle:
                 wav = io.BytesIO(handle.read()).getvalue()
         except Exception as e:
             logging.log(logging.ERROR, e)
@@ -117,6 +149,7 @@ def process_encode_request(request_data):
             # Delete the temp files
             os.unlink(temp_audio.name)
             os.unlink(temp_wav.name)
+            os.unlink(temp_wav_enh.name)
 
         # Generate the spectogram
         spectogram = synthesizer.make_spectrogram(wav)
@@ -448,6 +481,22 @@ def process_render_request(request_data):
 
     return response, 200
 
+
+def process_profile_request(request_data):
+    if os.environ.get("PROFILE_MEMORY") == "":
+        return "profiling is currently disabled", 400
+
+    # Get Memory Snapshot
+    snapshot = tracemalloc.take_snapshot()
+    top_stats = snapshot.statistics("lineno")
+
+    # Build response
+    stats_list = [str(stat) for stat in top_stats]
+    response = json.dumps(stats_list)
+
+    return response, 200
+
+
 # load_encoder loads the encoder into memory
 def load_encoder():
     if not encoder.is_loaded():
@@ -496,7 +545,17 @@ def load_vocoder():
     else:
         return True
 
-
+def load_voicefixer():
+    if not vf.is_loaded():
+        if os.path.exists(const.VOICEFIXER_ANALYZER_PATH) and os.path.exists(const.VOICEFIXER_VOCODER_PATH):
+            start = timer()
+            vf.load_model(const.VOICEFIXER_ANALYZER_PATH, const.VOICEFIXER_VOCODER_PATH)
+            logging.log(logging.INFO, "Successfully loaded voicefixer (%dms)." % int(1000 * (timer() - start)))
+            return True
+        else:
+            return False
+    else:
+        return True
 
 # check_token_auth validates a provided endpoint token
 def check_token_auth(client_token):
@@ -521,16 +580,26 @@ def get_version(request=None):
         }
     return response, 200
 
+
 # preload_models loads all models into memory on app startup (if flag is set)
 def preload_models():
     load_encoder()
     load_synthesizer()
     load_vocoder()
+    load_voicefixer()
 
+
+# Preload Models if flag is set
+if os.environ.get("PRELOAD") != "":
+    preload_models()
+
+# Init Main process
 if __name__ == "__main__":
-    # Preload Models if flag is set
-    if os.environ.get("PRELOAD"):
-        preload_models()
+    if os.environ.get("PROFILE_MEMORY") != "":
+        tracemalloc.start()
 
-    # Run the webserver for handling requests
-    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+    # Run the webserver for handling requests - see also:
+    # https://stackoverflow.com/questions/51025893/flask-at-first-run-do-not-use-the-development-server-in-a-production-environmen
+    from waitress import serve
+    # app.run(debug=False, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+    serve(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
