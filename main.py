@@ -350,6 +350,7 @@ def process_render_request(request_data):
     pitch_modifier = request_data["pitch_modifier"] if "pitch_modifier" in request_data else None
     energy_modifier = request_data["energy_modifier"] if "energy_modifier" in request_data else None
     render_graph = request_data["render_graph"] if "render_graph" in request_data else False
+    video_image_data = request_data["video_image_data"] if "video_image_data" in request_data else None
 
     # Check input
     if embed is None:
@@ -394,10 +395,55 @@ def process_render_request(request_data):
     if render_graph:
         spectogram = synthesizer.make_spectrogram(wav_string)
 
+    rendered_video = ''
+    if video_image_data:
+        # Render a video using provided background image or video and generated audio (request from a friend)
+        # if this failed, image data provided is invalid
+        try:
+            # Decode the image from payload
+            video_image_data = base64.b64decode(video_image_data)
+
+            # Save to temp file
+            temp_image = tempfile.NamedTemporaryFile(suffix='.image', delete=False)
+            temp_audio = tempfile.NamedTemporaryFile(suffix='.wav', prefix=os.path.basename(temp_image.name), delete=False)
+            temp_video = tempfile.NamedTemporaryFile(suffix='.mp4', prefix=os.path.basename(temp_image.name), delete=False)
+            try:
+                # Write image and wav bytes to file and close it as well as the target file, so ffmpeg can write to it
+                temp_image.write(io.BytesIO(video_image_data).getbuffer())
+                temp_audio.write(io.BytesIO(wav_string).getbuffer())
+                temp_image.close()
+                temp_audio.close()
+                temp_video.close()
+
+                # Video creation using ffmpeg
+                image_input = ffmpeg.input(temp_image.name)
+                audio_input = ffmpeg.input(temp_audio.name)
+                render = ffmpeg.output(
+                    image_input,
+                    audio_input,
+                    filename=temp_video.name,
+                    loop=1
+                )
+                render.run(overwrite_output=True)
+
+                # Read in using BytesIO
+                with open(temp_video.name, 'rb') as handle:
+                    rendered_video = io.BytesIO(handle.read()).getvalue()
+            finally:
+                # Delete the temp files
+                os.unlink(temp_image.name)
+                os.unlink(temp_audio.name)
+                os.unlink(temp_video.name)
+
+        except Exception as e:
+            logging.log(logging.ERROR, e)
+            return "invalid image provided", 400
+
     # Build response
     response = {
         "generated_wav": base64.b64encode(wav_string).decode('utf-8'),
-        "rendered_mel_graph": render.spectogram(spectogram) if render_graph else ''
+        "rendered_mel_graph": render.spectogram(spectogram) if render_graph else '',
+        "rendered_video": base64.b64encode(rendered_video).decode('utf-8') if len(rendered_video) > 0 else ''
     }
 
     return response, 200
