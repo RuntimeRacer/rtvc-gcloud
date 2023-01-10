@@ -451,13 +451,13 @@ def process_render_request(request_data):
                 # Video creation using ffmpeg
                 image_input = ffmpeg.input(temp_image.name)
                 audio_input = ffmpeg.input(temp_audio.name)
-                render = ffmpeg.output(
+                video_render = ffmpeg.output(
                     image_input,
                     audio_input,
                     filename=temp_video.name,
                     loop=1
                 )
-                render.run(overwrite_output=True)
+                video_render.run(overwrite_output=True)
 
                 # Read in using BytesIO
                 with open(temp_video.name, 'rb') as handle:
