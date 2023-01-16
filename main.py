@@ -121,7 +121,7 @@ def process_encode_request(request_data):
 
             # Download file and store in buffer
             r = requests.get(audio)
-            if not r.status_code != 200:
+            if r.status_code != 200:
                 return "target url did not return HTTP-200", 400
             audio = r.content
 
