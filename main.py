@@ -1,5 +1,8 @@
 import tracemalloc
 
+import requests
+import validators
+
 import hashlib
 import io
 import os
@@ -102,8 +105,29 @@ def process_encode_request(request_data):
 
     # Generate the spectogram - if this fails, audio data provided is invalid
     try:
-        # Decode the audio from payload
-        audio = base64.b64decode(audio)
+        # Check if audio is provided in binary format or is an URL
+        if validators.url(audio):
+            # Check if the URL is allowed to download from
+            valid_target = False
+            whitelist_urls = os.environ.get("WHITELIST_URLS")
+            whitelist_urls = whitelist_urls.split(",")
+            for url in whitelist_urls:
+                if url in audio:
+                    valid_target = True
+                    break
+
+            if not valid_target:
+                return "invalid target URL provided", 400
+
+            # Download file and store in buffer
+            r = requests.get(audio)
+            if not r.status_code != 200:
+                return "target url did not return HTTP-200", 400
+            audio = r.content
+
+        else:
+            # Decode the audio from payload
+            audio = base64.b64decode(audio)
 
         # Save to temp file and convert to waveform using FFMPEG
         # Also create the file for the enhancement here, even though we might not need it.

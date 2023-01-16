@@ -6,10 +6,11 @@
 flask
 flask_cors
 gunicorn
-#requests
+requests
 functions-framework==3.*
 google-cloud-storage
 google-cloud-logging
+validators
 
 # FFMPEG
 ffmpeg-python
