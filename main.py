@@ -47,6 +47,7 @@ CORS(app)
 @app.route("/synthesize", methods=['GET', 'POST'])
 @app.route("/vocode", methods=['GET', 'POST'])
 @app.route("/render", methods=['GET', 'POST'])
+@app.route("/render_batch", methods=['GET', 'POST'])
 @app.route("/profile", methods=['GET', 'POST'])
 def handle_request():
     # Evaluate request
@@ -77,6 +78,9 @@ def handle_request():
         return flask.make_response(response, code)
     if 'vocode' in request.path:
         response, code = process_vocode_request(request_data)
+        return flask.make_response(response, code)
+    if 'render_batch' in request.path:  # Note: this one before the 'render-only' handler so we can properly handle
+        response, code = process_render_batch_request(request_data)
         return flask.make_response(response, code)
     if 'render' in request.path:
         response, code = process_render_request(request_data)
@@ -394,18 +398,23 @@ def do_vocode(syn_mel, syn_breaks):
 # process_render_request -> Performs synthesize & vocode in a single step
 # Input params:
 # - speaker embedding
+# - speed modifier for generation
+# - pitch modifier for generation
+# - energy modifier for generation
 # - text to synthesize via embedding
 # (- fixed neural network seed)
+# (- flag whether to render a spectogram)
+# (- video image data; creates a video instead of audio with the provided image(s) in the background)
 # Returns:
-# - binary wav file of
+# - binary wav file of results
 def process_render_request(request_data):
     # Gather data from request
     embed = request_data["speaker_embed"] if "speaker_embed" in request_data else None
-    text = request_data["text"] if "text" in request_data else None
-    seed = request_data["seed"] if "seed" in request_data else None
     speed_modifier = request_data["speed_modifier"] if "speed_modifier" in request_data else None
     pitch_modifier = request_data["pitch_modifier"] if "pitch_modifier" in request_data else None
     energy_modifier = request_data["energy_modifier"] if "energy_modifier" in request_data else None
+    text = request_data["text"] if "text" in request_data else None
+    seed = request_data["seed"] if "seed" in request_data else None
     render_graph = request_data["render_graph"] if "render_graph" in request_data else False
     video_image_data = request_data["video_image_data"] if "video_image_data" in request_data else None
 
@@ -501,6 +510,83 @@ def process_render_request(request_data):
         "generated_wav": base64.b64encode(wav_string).decode('utf-8'),
         "rendered_mel_graph": render.spectogram(spectogram) if render_graph else '',
         "rendered_video": base64.b64encode(rendered_video).decode('utf-8') if len(rendered_video) > 0 else ''
+    }
+
+    return response, 200
+
+
+# process_render_batch_request -> Performs synthesize & vocode in a single step for multiple lines
+# Input params:
+# - speaker embedding
+# - speed modifier for generation
+# - pitch modifier for generation
+# - energy modifier for generation
+# - [texts to synthesize via embedding]
+# (- fixed neural network seed)
+# (- flag whether to render a spectogram for each wav)
+# Returns:
+# - [binary wav files for provide texts, in identical order]
+def process_render_batch_request(request_data):
+    # Gather data from request
+    embed = request_data["speaker_embed"] if "speaker_embed" in request_data else None
+    speed_modifier = request_data["speed_modifier"] if "speed_modifier" in request_data else None
+    pitch_modifier = request_data["pitch_modifier"] if "pitch_modifier" in request_data else None
+    energy_modifier = request_data["energy_modifier"] if "energy_modifier" in request_data else None
+    texts = request_data["texts"] if "texts" in request_data else None
+    seed = request_data["seed"] if "seed" in request_data else None
+    render_graph = request_data["render_graph"] if "render_graph" in request_data else False
+
+    # Check input
+    if embed is None:
+        return "no speaker embedding provided", 400
+    if texts is None or not isinstance(texts, list):
+        return "text data needs to be a list", 400
+    if len(texts) > 10:  # FIXME: make this an env var
+        return "maximum batching amount is 10", 400
+    for idx, text in enumerate(texts):
+        if len(text) < 1:
+            return "no text provided at list index {0}".format(idx), 400
+
+    # Decode input from base64
+    try:
+        embed = base64.b64decode(embed.encode('utf-8'))
+        embed = np.frombuffer(embed, dtype=np.float32)
+        text_data = []
+        for text in texts:
+            text_data.append(base64.decodebytes(text.encode('utf-8')).decode('utf-8'))
+    except Exception as e:
+        logging.log(logging.ERROR, e)
+        return "invalid embedding or text data provided", 400
+    logging.log(logging.INFO, "Using seed: %d" % seed)
+
+    # Load the models
+    if not load_synthesizer():
+        return "synthesizer model not found", 500
+    if not load_vocoder():
+        return "vocoder model not found", 500
+
+    # Perform the batch render
+    wav_strings = []
+    spectograms = []
+    for text in text_data:
+        # Perform the synthesis
+        syn_mel, syn_breaks = do_synthesis(text, embed, speed_modifier, pitch_modifier, energy_modifier)
+        # Perform the vocoding
+        wav_string = do_vocode(syn_mel, syn_breaks)
+
+        if render_graph:
+            spectogram = synthesizer.make_spectrogram(wav_string)
+            spectogram = render.spectogram(spectogram)
+            spectograms.append(spectogram)
+
+        # Encode the wav & append to list
+        wav_string = base64.b64encode(wav_string).decode('utf-8')
+        wav_strings.append(wav_string)
+
+    # Build response
+    response = {
+        "generated_wavs": wav_strings,
+        "rendered_mel_graphs": spectograms if render_graph else ''
     }
 
     return response, 200
