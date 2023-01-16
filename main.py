@@ -586,7 +586,7 @@ def process_render_batch_request(request_data):
     # Build response
     response = {
         "generated_wavs": wav_strings,
-        "rendered_mel_graphs": spectograms if render_graph else ''
+        "rendered_mel_graphs": spectograms if render_graph else []
     }
 
     return response, 200
