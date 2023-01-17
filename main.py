@@ -103,6 +103,7 @@ def process_encode_request(request_data):
     # Gather data from request
     audio = request_data["speaker_audio"] if "speaker_audio" in request_data else None
     enhance_audio = True if "enhance_audio" in request_data and request_data["enhance_audio"] == 1 else False
+    render_graph = request_data["render_graph"] if "render_graph" in request_data else False
 
     if audio is None:
         return "no speaker audio provided", 400
@@ -179,8 +180,6 @@ def process_encode_request(request_data):
             os.unlink(temp_wav.name)
             os.unlink(temp_wav_enh.name)
 
-        # Generate the spectogram
-        spectogram = synthesizer.make_spectrogram(wav)
     except Exception as e:
         logging.log(logging.ERROR, e)
         return "invalid speaker wav provided", 400
@@ -206,11 +205,15 @@ def process_encode_request(request_data):
     embed_md5 = hashlib.md5(embed)
     print("MD5 Checks - Encoded Wav: {0} Embed: {1}".format(encoder_wav_md5.hexdigest(), embed_md5.hexdigest()))
 
+    if render_graph:
+        # Generate the spectogram
+        spectogram = synthesizer.make_spectrogram(wav)
+
     # Build response
     response = {
         "embed": base64.b64encode(embed).decode('utf-8'),
-        "embed_graph": render.embedding(embed),
-        "embed_mel_graph": render.spectogram(spectogram)
+        "embed_graph": render.embedding(embed)  if render_graph else '',
+        "embed_mel_graph": render.spectogram(spectogram) if render_graph else ''
     }
 
     return response, 200
