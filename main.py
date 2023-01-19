@@ -55,10 +55,8 @@ def handle_request():
 
     # Token Auth
     if check_token_auth(request.headers.get('Api-Key')) is False:
-        response = {
-            "error": "invalid client token provided"
-        }
-        return flask.make_response(response, 403)
+        # invalid client token provided
+        return flask.make_response(const.ERROR_CLIENT_TOKEN_INVALID, 403)
 
     # Default route for non-post or bad request
     method = request.method
@@ -106,7 +104,8 @@ def process_encode_request(request_data):
     render_graph = request_data["render_graph"] if "render_graph" in request_data else False
 
     if audio is None:
-        return "no speaker audio provided", 400
+        # no speaker audio provided
+        return const.ERROR_NO_SAMPLE_PROVIDED, 400
 
     # Generate the spectogram - if this fails, audio data provided is invalid
     try:
@@ -122,12 +121,14 @@ def process_encode_request(request_data):
                     break
 
             if not valid_target:
-                return "invalid target URL provided", 400
+                # invalid target URL provided
+                return const.ERROR_INVALID_SAMPLE_URL, 400
 
             # Download file and store in buffer
             r = requests.get(audio)
             if r.status_code != 200:
-                return "target url did not return HTTP-200", 400
+                # target url did not return HTTP-200
+                return const.ERROR_SAMPLE_URL_RESPONSE, 400
             audio = r.content
 
         else:
@@ -149,7 +150,8 @@ def process_encode_request(request_data):
             # Check if audio file is valid and not too long
             duration = float(ffmpeg.probe(temp_audio.name)["format"]["duration"])
             if duration > const.INPUT_MAX_LENGTH_SECONDS or duration < const.INPUT_MIN_LENGTH_SECONDS:
-                return "input audio needs to have a duration between 0.5 of 15 seconds", 400
+                # input audio needs to have a duration between 0.5 of 15 seconds
+                return const.ERROR_SAMPLE_DURATION_INVALID, 400
 
             # Conversion using ffmpeg
             ffmpeg.input(temp_audio.name).output(temp_wav.name).run(overwrite_output=True)
@@ -160,7 +162,8 @@ def process_encode_request(request_data):
                 try:
                     # Load the model
                     if not load_voicefixer():
-                        return "voicefixer models not found", 500
+                        # voicefixer models not found
+                        return const.ERROR_VOICEFIXER_NOT_FOUND, 500
                     # Enhance the audio
                     vf.restore(input=temp_wav.name, output=temp_wav_enh.name)
                     # Use enhanced file as encoder reference file
@@ -182,7 +185,8 @@ def process_encode_request(request_data):
 
     except Exception as e:
         logging.log(logging.ERROR, e)
-        return "invalid speaker wav provided", 400
+        # invalid speaker wav provided
+        return const.ERROR_SAMPLE_DATA_INVALID, 400
 
     # Set Default Encoder Seed to 111
     torch.manual_seed(111)
@@ -193,17 +197,13 @@ def process_encode_request(request_data):
 
     # Load the model
     if not load_encoder():
-        return "encoder model not found", 500
+        # encoder model not found
+        return const.ERROR_ENCODER_NOT_FOUND, 500
 
     # process wav and generate embedding
     prep_wav = synthesizer.load_preprocess_wav(wav)
     encoder_wav = preprocess_wav(prep_wav)
     embed = encoder.embed_utterance(encoder_wav)
-
-    # Check embedding generation using MD5
-    encoder_wav_md5 = hashlib.md5(encoder_wav)
-    embed_md5 = hashlib.md5(embed)
-    print("MD5 Checks - Encoded Wav: {0} Embed: {1}".format(encoder_wav_md5.hexdigest(), embed_md5.hexdigest()))
 
     if render_graph:
         # Generate the spectogram
@@ -237,9 +237,11 @@ def process_synthesize_request(request_data):
 
     # Check input
     if embed is None:
-        return "no speaker embedding provided", 400
+        # no speaker embedding provided
+        return const.ERROR_NO_EMBEDDING_PROVIDED, 400
     if text is None or len(text) < 1:
-        return "no text provided", 400
+        # no text provided
+        return const.ERROR_NO_TEXT_PROVIDED, 400
 
     # Decode input from base64
     try:
@@ -248,7 +250,8 @@ def process_synthesize_request(request_data):
         text = base64.decodebytes(text.encode('utf-8')).decode('utf-8')
     except Exception as e:
         logging.log(logging.ERROR, e)
-        return "invalid embedding or text provided", 400
+        # invalid embedding or text provided
+        return const.ERROR_EMBEDDING_OR_TEXT_INVALID, 400
 
     # Apply seed
     if seed is None:
@@ -266,7 +269,8 @@ def process_synthesize_request(request_data):
 
     # Load the model
     if not load_synthesizer():
-        return "synthesizer model not found", 500
+        # synthesizer model not found
+        return const.ERROR_SYNTHESIZER_NOT_FOUND, 500
 
     # Perform the synthesis
     full_spectogram, breaks = do_synthesis(text, embed, speed_modifier, pitch_modifier, energy_modifier)
@@ -328,13 +332,15 @@ def process_vocode_request(request_data):
 
     # Check input
     if synthesized is None:
-        return "no synthesized data provided", 400
+        # no synthesized data provided
+        return const.ERROR_NO_SYNTHESIZED_DATA_PROVIDED, 400
 
     # Get mel and breaks
     syn_mel = synthesized["mel"] if "mel" in synthesized else None
     syn_breaks = synthesized["breaks"] if "breaks" in synthesized else None
     if syn_mel is None or syn_breaks is None:
-        return "invalid synthesis data provided", 400
+        # no synthesized data provided
+        return const.ERROR_NO_SYNTHESIZED_DATA_PROVIDED, 400
 
     # Decode input from base64
     try:
@@ -345,7 +351,8 @@ def process_vocode_request(request_data):
         syn_mel = np.array(syn_mel, dtype=np.float32)
     except Exception as e:
         logging.log(logging.ERROR, e)
-        return "invalid synthesis data provided", 400
+        # invalid synthesis data provided
+        return const.ERROR_SYNTHESIS_DATA_INVALID, 400
 
     # Apply seed
     if seed is None:
@@ -363,7 +370,8 @@ def process_vocode_request(request_data):
 
     # Load the model
     if not load_vocoder():
-        return "vocoder model not found", 500
+        # vocoder model not found
+        return const.ERROR_VOCODER_NOT_FOUND, 500
 
     # Perform the vocoding
     wav_string = do_vocode(syn_mel, syn_breaks)
@@ -423,9 +431,11 @@ def process_render_request(request_data):
 
     # Check input
     if embed is None:
-        return "no speaker embedding provided", 400
+        # no speaker embedding provided
+        return const.ERROR_NO_EMBEDDING_PROVIDED, 400
     if text is None or len(text) < 1:
-        return "no text provided", 400
+        # no text provided
+        return const.ERROR_NO_TEXT_PROVIDED, 400
 
     # Decode input from base64
     try:
@@ -434,7 +444,8 @@ def process_render_request(request_data):
         text = base64.decodebytes(text.encode('utf-8')).decode('utf-8')
     except Exception as e:
         logging.log(logging.ERROR, e)
-        return "invalid embedding or text provided", 400
+        # invalid embedding or text provided
+        return const.ERROR_EMBEDDING_OR_TEXT_INVALID, 400
 
     # Apply seed
     if seed is None:
@@ -446,14 +457,17 @@ def process_render_request(request_data):
             seed = manual_seed
         except Exception as e:
             logging.log(logging.ERROR, e)
-            return "invalid generation seed provided", 400
+            # invalid generation seed provided
+            return const.ERROR_SEED_INVALID, 400
     logging.log(logging.INFO, "Using seed: %d" % seed)
 
     # Load the models
     if not load_synthesizer():
-        return "synthesizer model not found", 500
+        # synthesizer model not found
+        return const.ERROR_SYNTHESIZER_NOT_FOUND, 500
     if not load_vocoder():
-        return "vocoder model not found", 500
+        # vocoder model not found
+        return const.ERROR_VOCODER_NOT_FOUND, 500
 
     # Perform the synthesis
     syn_mel, syn_breaks = do_synthesis(text, embed, speed_modifier, pitch_modifier, energy_modifier)
@@ -506,7 +520,8 @@ def process_render_request(request_data):
 
         except Exception as e:
             logging.log(logging.ERROR, e)
-            return "invalid image provided", 400
+            # invalid image provided
+            return const.ERROR_IMAGE_DATA_INVALID, 400
 
     # Build response
     response = {
@@ -541,14 +556,18 @@ def process_render_batch_request(request_data):
 
     # Check input
     if embed is None:
-        return "no speaker embedding provided", 400
+        # no speaker embedding provided
+        return const.ERROR_NO_EMBEDDING_PROVIDED, 400
     if texts is None or not isinstance(texts, list):
-        return "text data needs to be a list", 400
+        # text data needs to be a list
+        return const.ERROR_TEXTS_NOT_A_LIST, 400
     if len(texts) > 10:  # FIXME: make this an env var
-        return "maximum batching amount is 10", 400
+        # maximum batching amount is 10
+        return const.ERROR_BATCHING_AMOUNT_EXCEEDED, 400
     for idx, text in enumerate(texts):
         if len(text) < 1:
-            return "no text provided at list index {0}".format(idx), 400
+            # one of the texts is empty
+            return const.ERROR_TEXTS_EMPTY, 400
 
     # Decode input from base64
     try:
@@ -559,14 +578,17 @@ def process_render_batch_request(request_data):
             text_data.append(base64.decodebytes(text.encode('utf-8')).decode('utf-8'))
     except Exception as e:
         logging.log(logging.ERROR, e)
-        return "invalid embedding or text data provided", 400
+        # invalid embedding or text data provided
+        return const.ERROR_EMBEDDING_OR_TEXT_INVALID, 400
     logging.log(logging.INFO, "Using seed: %d" % seed)
 
     # Load the models
     if not load_synthesizer():
-        return "synthesizer model not found", 500
+        # synthesizer model not found
+        return const.ERROR_SYNTHESIZER_NOT_FOUND, 500
     if not load_vocoder():
-        return "vocoder model not found", 500
+        # vocoder model not found
+        return const.ERROR_VOCODER_NOT_FOUND, 500
 
     # Perform the batch render
     wav_strings = []
@@ -597,7 +619,8 @@ def process_render_batch_request(request_data):
 
 def process_profile_request(request_data):
     if os.environ.get("PROFILE_MEMORY") == "":
-        return "profiling is currently disabled", 400
+        # profiling is currently disabled
+        return const.ERROR_PROFILING_DISABLED, 400
 
     # Get Memory Snapshot
     snapshot = tracemalloc.take_snapshot()
