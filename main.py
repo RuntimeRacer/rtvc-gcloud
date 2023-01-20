@@ -580,6 +580,19 @@ def process_render_batch_request(request_data):
         logging.log(logging.ERROR, e)
         # invalid embedding or text data provided
         return const.ERROR_EMBEDDING_OR_TEXT_INVALID, 400
+
+    # Apply seed
+    if seed is None:
+        seed = torch.seed()
+    else:
+        try:
+            manual_seed = int(seed)
+            torch.manual_seed(manual_seed)
+            seed = manual_seed
+        except Exception as e:
+            logging.log(logging.ERROR, e)
+            # invalid generation seed provided
+            return const.ERROR_SEED_INVALID, 400
     logging.log(logging.INFO, "Using seed: %d" % seed)
 
     # Load the models
