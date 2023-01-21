@@ -109,31 +109,10 @@ def process_encode_request(request_data):
 
     # Generate the spectogram - if this fails, audio data provided is invalid
     try:
-        # Check if audio is provided in binary format or is an URL
-        if validators.url(audio):
-            # Check if the URL is allowed to download from
-            valid_target = False
-            whitelist_urls = os.environ.get("WHITELIST_URLS")
-            whitelist_urls = whitelist_urls.split(",")
-            for url in whitelist_urls:
-                if url in audio:
-                    valid_target = True
-                    break
-
-            if not valid_target:
-                # invalid target URL provided
-                return const.ERROR_INVALID_SAMPLE_URL, 400
-
-            # Download file and store in buffer
-            r = requests.get(audio)
-            if r.status_code != 200:
-                # target url did not return HTTP-200
-                return const.ERROR_SAMPLE_URL_RESPONSE, 400
-            audio = r.content
-
-        else:
-            # Decode the audio from payload
-            audio = base64.b64decode(audio)
+        # Fetch audio data
+        audio, success = fetch_data_from_url_or_decode(audio)
+        if not success:
+            return audio, 400
 
         # Save to temp file and convert to waveform using FFMPEG
         # Also create the file for the enhancement here, even though we might not need it.
@@ -483,8 +462,10 @@ def process_render_request(request_data):
         # Render a video using provided background image or video and generated audio (request from a friend)
         # if this failed, image data provided is invalid
         try:
-            # Decode the image from payload
-            video_image_data = base64.b64decode(video_image_data)
+            # Fetch video data
+            video_image_data, success = fetch_data_from_url_or_decode(video_image_data)
+            if not success:
+                return video_image_data, 400
 
             # Save to temp file
             temp_image = tempfile.NamedTemporaryFile(suffix='.image', delete=False)
@@ -660,6 +641,7 @@ def load_encoder():
     else:
         return True
 
+
 # load_synthesizer loads the synthesizer into memory
 def load_synthesizer():
     if not synthesizer.is_loaded():
@@ -672,6 +654,7 @@ def load_synthesizer():
             return False
     else:
         return True
+
 
 # load_vocoder loads the vocoder into memory
 def load_vocoder():
@@ -694,6 +677,7 @@ def load_vocoder():
     else:
         return True
 
+
 def load_voicefixer():
     if not vf.is_loaded():
         if os.path.exists(const.VOICEFIXER_ANALYZER_PATH) and os.path.exists(const.VOICEFIXER_VOCODER_PATH):
@@ -706,12 +690,14 @@ def load_voicefixer():
     else:
         return True
 
+
 # check_token_auth validates a provided endpoint token
 def check_token_auth(client_token):
     env_token = os.environ.get("END_POINT_TOKEN", "")
     if len(env_token) == 0 or client_token != env_token:
         return False
     return True
+
 
 # get_version returns basic info on this gcloud function
 def get_version(request=None):
@@ -728,6 +714,35 @@ def get_version(request=None):
             "route": request.path
         }
     return response, 200
+
+
+def fetch_data_from_url_or_decode(url_or_data):
+    # Check if data is provided in binary format or is an URL
+    if validators.url(url_or_data):
+        # Check if the URL is allowed to download from
+        valid_target = False
+        whitelist_urls = os.environ.get("WHITELIST_URLS")
+        whitelist_urls = whitelist_urls.split(",")
+        for url in whitelist_urls:
+            if url in url_or_data:
+                valid_target = True
+                break
+
+        if not valid_target:
+            # invalid target URL provided
+            return const.ERROR_DATA_URL_INVALID, False
+
+        # Download file and store in buffer
+        r = requests.get(url_or_data)
+        if r.status_code != 200:
+            # target url did not return HTTP-200
+            return const.ERROR_SAMPLE_URL_RESPONSE, False
+
+        # Return data fetched from URL
+        return r.content, True
+
+    # Decode the image from payload
+    return base64.b64decode(url_or_data), True
 
 
 # preload_models loads all models into memory on app startup (if flag is set)
