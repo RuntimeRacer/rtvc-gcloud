@@ -463,7 +463,7 @@ def process_render_request(request_data):
         # if this failed, image data provided is invalid
         try:
             # Fetch video data
-            video_image_data, success = fetch_data_from_url_or_decode(video_image_data, decode_data=False)
+            video_image_data, success = fetch_data_from_url_or_decode(video_image_data)
             if not success:
                 return video_image_data, 400
 
