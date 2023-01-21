@@ -463,7 +463,7 @@ def process_render_request(request_data):
         # if this failed, image data provided is invalid
         try:
             # Fetch video data
-            video_image_data, success = fetch_data_from_url_or_decode(video_image_data)
+            video_image_data, success = fetch_data_from_url_or_decode(video_image_data, decode_data=False)
             if not success:
                 return video_image_data, 400
 
@@ -716,7 +716,7 @@ def get_version(request=None):
     return response, 200
 
 
-def fetch_data_from_url_or_decode(url_or_data):
+def fetch_data_from_url_or_decode(url_or_data, decode_data=True):
     # Check if data is provided in binary format or is an URL
     if validators.url(url_or_data):
         # Check if the URL is allowed to download from
@@ -741,8 +741,11 @@ def fetch_data_from_url_or_decode(url_or_data):
         # Return data fetched from URL
         return r.content, True
 
-    # Decode the image from payload
-    return base64.b64decode(url_or_data), True
+    if decode_data:
+        # Decode the image from payload
+        return base64.b64decode(url_or_data), True
+
+    return url_or_data, True
 
 
 # preload_models loads all models into memory on app startup (if flag is set)
