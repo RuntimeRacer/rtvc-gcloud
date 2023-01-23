@@ -192,7 +192,8 @@ def process_encode_request(request_data):
     response = {
         "embed": base64.b64encode(embed).decode('utf-8'),
         "embed_graph": render.embedding(embed)  if render_graph else '',
-        "embed_mel_graph": render.spectogram(spectogram) if render_graph else ''
+        "embed_mel_graph": render.spectogram(spectogram) if render_graph else '',
+        "version": const.BACKEND_VERSION
     }
 
     return response, 200
@@ -264,7 +265,8 @@ def process_synthesize_request(request_data):
             "mel": base64.b64encode(full_spectogram_json.encode('utf-8')).decode('utf-8'),
             "breaks": base64.b64encode(breaks_json.encode('utf-8')).decode('utf-8')
         },
-        "synthesized_mel_graph": render.spectogram(full_spectogram)
+        "synthesized_mel_graph": render.spectogram(full_spectogram),
+        "version": const.BACKEND_VERSION
     }
 
     return response, 200
@@ -357,7 +359,8 @@ def process_vocode_request(request_data):
 
     # Build response
     response = {
-        "generated_wav": base64.b64encode(wav_string).decode('utf-8')
+        "generated_wav": base64.b64encode(wav_string).decode('utf-8'),
+        "version": const.BACKEND_VERSION
     }
 
     return response, 200
@@ -508,7 +511,8 @@ def process_render_request(request_data):
     response = {
         "generated_wav": base64.b64encode(wav_string).decode('utf-8'),
         "rendered_mel_graph": render.spectogram(spectogram) if render_graph else '',
-        "rendered_video": base64.b64encode(rendered_video).decode('utf-8') if len(rendered_video) > 0 else ''
+        "rendered_video": base64.b64encode(rendered_video).decode('utf-8') if len(rendered_video) > 0 else '',
+        "version": const.BACKEND_VERSION
     }
 
     return response, 200
@@ -605,7 +609,8 @@ def process_render_batch_request(request_data):
     # Build response
     response = {
         "generated_wavs": wav_strings,
-        "rendered_mel_graphs": spectograms if render_graph else []
+        "rendered_mel_graphs": spectograms if render_graph else [],
+        "version": const.BACKEND_VERSION
     }
 
     return response, 200

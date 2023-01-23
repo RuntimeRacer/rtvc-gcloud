@@ -1,3 +1,6 @@
+# APPLICATION
+BACKEND_VERSION = '1'
+
 # MODEL PATHS
 ENCODER_PATH = 'models/encoder.pt'
 SYNTHESIZER_PATH = 'models/synthesizer.pt'
