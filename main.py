@@ -222,14 +222,24 @@ def process_synthesize_request(request_data):
     if text is None or len(text) < 1:
         # no text provided
         return const.ERROR_NO_TEXT_PROVIDED, 400
-    if speed_modifier is None:
-        # Invalid Speed Modifier
+    # Modifiers
+    try:
+        if speed_modifier is None:
+            return const.ERROR_SPEED_MODIFIER_INVALID, 400
+        speed_modifier = float(speed_modifier)
+    except ValueError:
         return const.ERROR_SPEED_MODIFIER_INVALID, 400
-    if pitch_modifier is None:
-        # Invalid Pitch Modifier
+    try:
+        if pitch_modifier is None:
+            return const.ERROR_PITCH_MODIFIER_INVALID, 400
+        pitch_modifier = float(pitch_modifier)
+    except ValueError:
         return const.ERROR_PITCH_MODIFIER_INVALID, 400
-    if energy_modifier is None:
-        # Invalid Energy Modifier
+    try:
+        if energy_modifier is None:
+            return const.ERROR_ENERGY_MODIFIER_INVALID, 400
+        energy_modifier = float(energy_modifier)
+    except ValueError:
         return const.ERROR_ENERGY_MODIFIER_INVALID, 400
 
     # Decode input from base64
@@ -427,14 +437,24 @@ def process_render_request(request_data):
     if text is None or len(text) < 1:
         # no text provided
         return const.ERROR_NO_TEXT_PROVIDED, 400
-    if speed_modifier is None:
-        # Invalid Speed Modifier
+    # Modifiers
+    try:
+        if speed_modifier is None:
+            return const.ERROR_SPEED_MODIFIER_INVALID, 400
+        speed_modifier = float(speed_modifier)
+    except ValueError:
         return const.ERROR_SPEED_MODIFIER_INVALID, 400
-    if pitch_modifier is None:
-        # Invalid Pitch Modifier
+    try:
+        if pitch_modifier is None:
+            return const.ERROR_PITCH_MODIFIER_INVALID, 400
+        pitch_modifier = float(pitch_modifier)
+    except ValueError:
         return const.ERROR_PITCH_MODIFIER_INVALID, 400
-    if energy_modifier is None:
-        # Invalid Energy Modifier
+    try:
+        if energy_modifier is None:
+            return const.ERROR_ENERGY_MODIFIER_INVALID, 400
+        energy_modifier = float(energy_modifier)
+    except ValueError:
         return const.ERROR_ENERGY_MODIFIER_INVALID, 400
 
     # Decode input from base64
@@ -561,15 +581,26 @@ def process_render_batch_request(request_data):
     if embed is None:
         # no speaker embedding provided
         return const.ERROR_NO_EMBEDDING_PROVIDED, 400
-    if speed_modifier is None:
-        # Invalid Speed Modifier
+    # Modifiers
+    try:
+        if speed_modifier is None:
+            return const.ERROR_SPEED_MODIFIER_INVALID, 400
+        speed_modifier = float(speed_modifier)
+    except ValueError:
         return const.ERROR_SPEED_MODIFIER_INVALID, 400
-    if pitch_modifier is None:
-        # Invalid Pitch Modifier
+    try:
+        if pitch_modifier is None:
+            return const.ERROR_PITCH_MODIFIER_INVALID, 400
+        pitch_modifier = float(pitch_modifier)
+    except ValueError:
         return const.ERROR_PITCH_MODIFIER_INVALID, 400
-    if energy_modifier is None:
-        # Invalid Energy Modifier
+    try:
+        if energy_modifier is None:
+            return const.ERROR_ENERGY_MODIFIER_INVALID, 400
+        energy_modifier = float(energy_modifier)
+    except ValueError:
         return const.ERROR_ENERGY_MODIFIER_INVALID, 400
+    # Text
     if texts is None or not isinstance(texts, list):
         # text data needs to be a list
         return const.ERROR_TEXTS_NOT_A_LIST, 400
