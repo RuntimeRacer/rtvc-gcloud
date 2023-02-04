@@ -428,6 +428,7 @@ def process_render_request(request_data):
     text = request_data["text"] if "text" in request_data else None
     seed = request_data["seed"] if "seed" in request_data else None
     render_graph = request_data["render_graph"] if "render_graph" in request_data else False
+    render_mp3 = request_data["render_mp3"] if "render_mp3" in request_data else False
     video_image_data = request_data["video_image_data"] if "video_image_data" in request_data else None
 
     # Check input
@@ -498,47 +499,79 @@ def process_render_request(request_data):
     if render_graph:
         spectogram = synthesizer.make_spectrogram(wav_string)
 
+    rendered_mp3 = ''
     rendered_video = ''
-    if video_image_data:
+    if video_image_data or render_mp3:
         # Render a video using provided background image or video and generated audio (request from a friend)
         # if this failed, image data provided is invalid
         try:
-            # Fetch video data
-            video_image_data, success = fetch_data_from_url_or_decode(video_image_data)
-            if not success:
-                return video_image_data, 400
+            # Save create temp file handles
+            temp_wav = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
+            temp_audio = tempfile.NamedTemporaryFile(suffix='.mp3', prefix=os.path.basename(temp_wav.name),
+                                                     delete=False)
+            temp_image = tempfile.NamedTemporaryFile(suffix='.image', prefix=os.path.basename(temp_wav.name),delete=False)
+            temp_video = tempfile.NamedTemporaryFile(suffix='.mp4', prefix=os.path.basename(temp_wav.name),delete=False)
 
-            # Save to temp file
-            temp_image = tempfile.NamedTemporaryFile(suffix='.image', delete=False)
-            temp_audio = tempfile.NamedTemporaryFile(suffix='.wav', prefix=os.path.basename(temp_image.name), delete=False)
-            temp_video = tempfile.NamedTemporaryFile(suffix='.mp4', prefix=os.path.basename(temp_image.name), delete=False)
+            if video_image_data:
+                # Fetch video data
+                video_image_data, success = fetch_data_from_url_or_decode(video_image_data)
+                if not success:
+                    return video_image_data, 400
+
             try:
-                # Write image and wav bytes to file and close it as well as the target file, so ffmpeg can write to it
-                temp_image.write(io.BytesIO(video_image_data).getbuffer())
-                temp_audio.write(io.BytesIO(wav_string).getbuffer())
+                # Write image and wav bytes to file
+                temp_wav.write(io.BytesIO(wav_string).getbuffer())
+                if video_image_data:
+                    temp_image.write(io.BytesIO(video_image_data).getbuffer())
+
+                # close all the files, so ffmpeg can write to it
                 temp_image.close()
+                temp_wav.close()
                 temp_audio.close()
                 temp_video.close()
 
                 # Video creation using ffmpeg
-                image_input = ffmpeg.input(temp_image.name)
-                audio_input = ffmpeg.input(temp_audio.name)
-                video_render = ffmpeg.output(
-                    image_input,
-                    audio_input,
-                    filename=temp_video.name,
-                    loop=1
-                )
-                video_render.run(overwrite_output=True)
+                wav_input = ffmpeg.input(temp_wav.name)
+
+                # The video handle
+                if video_image_data:
+                    image_input = ffmpeg.input(temp_image.name)
+                    video_render = ffmpeg.output(
+                        image_input,
+                        wav_input,
+                        filename=temp_video.name,
+                        loop=1
+                    )
+
+                # The mp3 handler
+                if render_mp3:
+                    audio_render = ffmpeg.output(
+                        wav_input,
+                        filename=temp_audio.name
+                    )
+
+                # Execute render step
+                if video_image_data and render_mp3:
+                    combined_render = ffmpeg.merge_outputs(video_render, audio_render)
+                    combined_render.run(overwrite_output=True)
+                elif video_image_data:
+                    video_render.run(overwrite_output=True)
+                elif render_mp3:
+                    audio_render.run(overwrite_output=True)
 
                 # Read in using BytesIO
-                with open(temp_video.name, 'rb') as handle:
-                    rendered_video = io.BytesIO(handle.read()).getvalue()
+                if video_image_data:
+                    with open(temp_video.name, 'rb') as handle:
+                        rendered_video = io.BytesIO(handle.read()).getvalue()
+                if render_mp3:
+                    with open(temp_audio.name, 'rb') as handle:
+                        rendered_mp3 = io.BytesIO(handle.read()).getvalue()
             finally:
                 # Delete the temp files
                 os.unlink(temp_image.name)
-                os.unlink(temp_audio.name)
+                os.unlink(temp_wav.name)
                 os.unlink(temp_video.name)
+                os.unlink(temp_audio.name)
 
         except Exception as e:
             logging.log(logging.ERROR, e)
@@ -549,6 +582,7 @@ def process_render_request(request_data):
     response = {
         "generated_wav": base64.b64encode(wav_string).decode('utf-8'),
         "rendered_mel_graph": render.spectogram(spectogram) if render_graph else '',
+        "rendered_mp3": base64.b64encode(rendered_mp3).decode('utf-8') if len(rendered_mp3) > 0 else '',
         "rendered_video": base64.b64encode(rendered_video).decode('utf-8') if len(rendered_video) > 0 else '',
         "version": const.BACKEND_VERSION
     }
