@@ -393,7 +393,7 @@ def do_vocode(syn_mel, syn_breaks):
     b_starts = np.concatenate(([0], b_ends[:-1]))
     wavs = [wav[start:end] for start, end, in zip(b_starts, b_ends)]
     syn_breaks = [np.zeros(int(0.15 * sp.sample_rate))] * len(syn_breaks)
-    wav = np.concatenate([i for w, b in zip(wavs, syn_breaks) for i in (w, b)])
+    wav = np.concatenate([i for w, b in zip(wavs, syn_breaks) for i in (w.cpu(), b)])
 
     # Apply optimizations
     #wav = preprocess_wav(wav)  # Trim silences

@@ -73,6 +73,7 @@ def is_loaded():
 
 
 def infer_waveform(mel, normalize=True, batched=True, target=None, overlap=None):
+    global _device
     """
     Infers the waveform of a mel spectrogram output by the synthesizer (the format must match
     that of the synthesizer!)
@@ -107,7 +108,7 @@ def infer_waveform(mel, normalize=True, batched=True, target=None, overlap=None)
             if _model["generator"].pqmf is None and hparams.generator_out_channels > 1:
                 _model["generator"].pqmf = PQMF(
                     subbands=hparams.generator_out_channels,
-                )
+                ).to(_device)
             # Prepare mel for decoding
             if normalize:
                 mel = mel / sp.max_abs_value
