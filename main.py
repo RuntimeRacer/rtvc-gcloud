@@ -33,6 +33,10 @@ from synthesizer import inference as synthesizer
 from vocoder import inference as vocoder, base as voc_base
 from voicefixer import base as vf
 
+# Whisper
+import whisper
+_whisper_model = None # type: whisper.Whisper
+
 
 # Cloud Run related stuff
 app = flask.Flask(__name__)
@@ -49,6 +53,7 @@ CORS(app)
 @app.route("/render", methods=['GET', 'POST'])
 @app.route("/render_batch", methods=['GET', 'POST'])
 @app.route("/profile", methods=['GET', 'POST'])
+@app.route("/whisper", methods=['GET', 'POST'])
 def handle_request():
     # Evaluate request
     request = flask.request
@@ -86,6 +91,9 @@ def handle_request():
     if 'profile' in request.path:
         response, code = process_profile_request(request_data)
         return flask.make_response(response, code)
+    if 'whisper' in request.path:
+        response, code = process_whipser_request(request_data)
+        return flask.make_response(response, code)
     else:
         response, code = get_version(request)
         return flask.make_response(response, code)
@@ -105,7 +113,7 @@ def process_encode_request(request_data):
 
     if audio is None:
         # no speaker audio provided
-        return const.ERROR_NO_SAMPLE_PROVIDED, 400
+        return const.ERROR_NO_AUDIO_PROVIDED, 400
 
     # Generate the spectogram - if this fails, audio data provided is invalid
     try:
@@ -724,6 +732,36 @@ def process_profile_request(request_data):
     return response, 200
 
 
+def process_whipser_request(request_data):
+    global _whisper_model
+    audio = request_data["audio"] if "audio" in request_data else None
+
+    # Check input
+    if audio is None:
+        # no speaker embedding provided
+        return const.ERROR_NO_AUDIO_PROVIDED, 400
+
+    # Check Model
+    if _whisper_model is None:
+        # no speaker embedding provided
+        return const.ERROR_WHISPER_NOT_FOUND, 500
+
+    # Convert to Audio File Stream
+    audio_wav = base64.b64decode(audio.encode('utf-8'))
+    audio_data = preprocess_wav(audio_wav)
+
+
+    # Transcribe text
+    result = whisper.transcribe(audio=audio_data, model=_whisper_model, verbose=False, language='en')
+
+    # Build response
+    response = {
+        "utterance": result["text"]
+    }
+
+    return response, 200
+
+
 # load_encoder loads the encoder into memory
 def load_encoder():
     if not encoder.is_loaded():
@@ -847,6 +885,11 @@ def fetch_data_from_url_or_decode(url_or_data, decode_data=True):
 
 # preload_models loads all models into memory on app startup (if flag is set)
 def preload_models():
+    global _whisper_model
+
+    if os.path.exists('models/whisper/medium.en.pt'):
+        _whisper_model = whisper.load_model('models/whisper/medium.en.pt')  # Quick and dirty
+
     load_encoder()
     load_synthesizer()
     load_vocoder()

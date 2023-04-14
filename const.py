@@ -15,7 +15,7 @@ INPUT_MAX_LENGTH_SECONDS = 15
 
 # ERROR CODES
 ERROR_CLIENT_TOKEN_INVALID = 'error_client_token_invalid'
-ERROR_NO_SAMPLE_PROVIDED = 'error_no_speaker_audio_provided'
+ERROR_NO_AUDIO_PROVIDED = 'error_no_speaker_audio_provided'
 ERROR_NO_EMBEDDING_PROVIDED = 'error_no_speaker_embedding_provided'
 ERROR_NO_TEXT_PROVIDED = 'error_no_speaker_embedding_provided'
 ERROR_NO_SYNTHESIZED_DATA_PROVIDED = 'error_no_synthesized_data_provided'
@@ -37,4 +37,5 @@ ERROR_VOICEFIXER_NOT_FOUND = 'error_voicefixer_not_found'
 ERROR_ENCODER_NOT_FOUND = 'error_encoder_not_found'
 ERROR_SYNTHESIZER_NOT_FOUND = 'error_synthesizer_not_found'
 ERROR_VOCODER_NOT_FOUND = 'error_vocoder_not_found'
+ERROR_WHISPER_NOT_FOUND = 'error_whisper_not_found'
 ERROR_PROFILING_DISABLED = 'error_profiling_disabled'
