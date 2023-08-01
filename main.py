@@ -34,9 +34,11 @@ from vocoder import inference as vocoder, base as voc_base
 from voicefixer import base as vf
 
 # Whisper
-import whisper
-_whisper_model = None # type: whisper.Whisper
+import faster_whisper
+_whisper_model = None  # type: faster_whisper.WhisperModel
 
+# Init logger
+logging.basicConfig(level=logging.INFO)
 
 # Cloud Run related stuff
 app = flask.Flask(__name__)
@@ -750,13 +752,16 @@ def process_whipser_request(request_data):
     audio_wav = base64.b64decode(audio.encode('utf-8'))
     audio_data = preprocess_wav(audio_wav)
 
-
     # Transcribe text
-    result = whisper.transcribe(audio=audio_data, model=_whisper_model, verbose=False, language='en')
+    start = timer()
+    segments, _ = _whisper_model.transcribe(audio=audio_data, vad_filter=True)
+    result_list = [segment.text for segment in segments]
+    result = " ".join(result_list)
+    logging.log(logging.INFO, "Successfully decocded audio (%dms)." % int(1000 * (timer() - start)))
 
     # Build response
     response = {
-        "utterance": result["text"]
+        "utterance": result
     }
 
     return response, 200
@@ -826,6 +831,22 @@ def load_voicefixer():
         return True
 
 
+def load_whisper():
+    global _whisper_model
+
+    if _whisper_model is None:
+        whisper_model_path = 'models/faster-whisper/{0}'.format(os.environ.get("WHISPER_MODEL_NAME"))
+        if os.path.exists(whisper_model_path):
+            start = timer()
+            _whisper_model = faster_whisper.WhisperModel(whisper_model_path)
+            logging.log(logging.INFO, "Successfully loaded whisper (%dms)." % int(1000 * (timer() - start)))
+            return True
+        else:
+            return False
+    else:
+        return True
+
+
 # check_token_auth validates a provided endpoint token
 def check_token_auth(client_token):
     env_token = os.environ.get("END_POINT_TOKEN", "")
@@ -885,15 +906,11 @@ def fetch_data_from_url_or_decode(url_or_data, decode_data=True):
 
 # preload_models loads all models into memory on app startup (if flag is set)
 def preload_models():
-    global _whisper_model
-
-    if os.path.exists('models/whisper/medium.en.pt'):
-        _whisper_model = whisper.load_model('models/whisper/medium.en.pt')  # Quick and dirty
-
     load_encoder()
     load_synthesizer()
     load_vocoder()
-    load_voicefixer()
+    #load_voicefixer()
+    load_whisper()
 
 
 # Preload Models if flag is set

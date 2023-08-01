@@ -43,3 +43,4 @@ filelock
 pyyaml
 streamlit>=1.12.0
 waitress
+faster-whisper
