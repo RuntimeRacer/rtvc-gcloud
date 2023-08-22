@@ -6,20 +6,26 @@
 flask
 flask_cors
 gunicorn
-#requests
+requests
 functions-framework==3.*
 google-cloud-storage
 google-cloud-logging
+validators
+
+# FFMPEG
+ffmpeg-python
 
 # PyTorch
-https://download.pytorch.org/whl/cpu/torch-1.10.0%2Bcpu-cp38-cp38-linux_x86_64.whl
-https://download.pytorch.org/whl/cpu/torchaudio-0.10.0%2Bcpu-cp38-cp38-linux_x86_64.whl
-https://download.pytorch.org/whl/cpu/torchvision-0.11.1%2Bcpu-cp38-cp38-linux_x86_64.whl
+https://download.pytorch.org/whl/cpu/torch-1.10.0%2Bcpu-cp38-cp38-linux_x86_64.whl ; platform_system != "Windows"
+https://download.pytorch.org/whl/cpu/torchaudio-0.10.0%2Bcpu-cp38-cp38-linux_x86_64.whl ; platform_system != "Windows"
+https://download.pytorch.org/whl/cpu/torchvision-0.11.1%2Bcpu-cp38-cp38-linux_x86_64.whl ; platform_system != "Windows"
 
 # SV2TTS
-librosa>=0.8.0
+librosa>=0.8.1,<0.9.0
+torchlibrosa==0.0.7
 matplotlib>=3.3.0
-numpy==1.19.4
+numpy==1.19.3; platform_system == "Windows"
+numpy==1.19.4; platform_system != "Windows"
 scipy>=1.0.0
 SoundFile
 Unidecode
@@ -32,3 +38,8 @@ webvtt-py
 # accelerate==0.4.0
 psutil
 noisereduce
+h5py
+filelock
+pyyaml
+streamlit>=1.12.0
+waitress

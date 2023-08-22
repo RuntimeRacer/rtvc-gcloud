@@ -3,12 +3,12 @@ import math
 from concurrent.futures import ThreadPoolExecutor
 
 from config.hparams import sp, wavernn_fatchord, wavernn_geneing, wavernn_runtimeracer
-from vocoder.models import base
+from vocoder import base
 from vocoder.audio import decode_mu_law, de_emphasis
 from pathlib import Path
 import numpy as np
 import psutil
-import WaveRNNVocoder
+# import WaveRNNVocoder
 
 
 class Vocoder:
@@ -45,12 +45,12 @@ class Vocoder:
 
         # Init wrapper list
         self._processing_thread_wrappers = []
-        for tID in range(cpus):
-            # Init vocoder wrapper for the model file
-            vocoder = WaveRNNVocoder.Vocoder()
-            vocoder.loadWeights(str(self.model_fpath))
-            # Append it tot the wrapper list
-            self._processing_thread_wrappers.append(vocoder)
+        # for tID in range(cpus):
+        #     # Init vocoder wrapper for the model file
+        #     vocoder = WaveRNNVocoder.Vocoder()
+        #     vocoder.loadWeights(str(self.model_fpath))
+        #     # Append it tot the wrapper list
+        #     self._processing_thread_wrappers.append(vocoder)
 
     def vocode_mel(self, mel, normalize=True, progress_callback=None):
         """

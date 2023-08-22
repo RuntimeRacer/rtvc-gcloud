@@ -1,3 +1,4 @@
+import hashlib
 import io
 from pathlib import Path
 from typing import List, Union
@@ -167,9 +168,11 @@ def load_model(weights_fpath, verbose=True):
     _model.load()
 
 def is_loaded():
+    global _model
     return _model is not None and _model.is_loaded()
 
 def get_model_type():
+    global _model
     if not is_loaded():
         raise Exception("Please load Synthesizer in memory before using it")
     else:
@@ -177,6 +180,7 @@ def get_model_type():
 
 def synthesize_spectrograms(texts: List[str], embeddings: Union[np.ndarray, List[np.ndarray]], return_alignments=False,
                             speed_modifier=1.0, pitch_function=None, energy_function=None):
+    global _model
     if not is_loaded():
         raise Exception("Please load Synthesizer in memory before using it")
     return _model.synthesize_spectrograms(texts=texts, embeddings=embeddings, return_alignments=return_alignments,
@@ -189,8 +193,14 @@ def load_preprocess_wav(wav):
     train the synthesizer.
     """
     wav = librosa.load(io.BytesIO(wav), sr=sp.sample_rate)[0]
+    wav_md5 = hashlib.md5(wav)
+    print("MD5 Checks - Wav: {0}".format(wav_md5.hexdigest()))
+
     if preprocessing.rescale:
         wav = wav / np.abs(wav).max() * preprocessing.rescaling_max
+
+    prep_wav_md5 = hashlib.md5(wav)
+    print("MD5 Checks - Preprocessed Wav: {0}".format(prep_wav_md5.hexdigest()))
     return wav
 
 def make_spectrogram(wav):

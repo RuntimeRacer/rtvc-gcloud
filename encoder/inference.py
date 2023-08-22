@@ -41,6 +41,7 @@ def load_model(weights_fpath: Path, device=None):
     
     
 def is_loaded():
+    global _model
     return _model is not None
 
 
@@ -52,6 +53,7 @@ def embed_frames_batch(frames_batch):
     (batch_size, n_frames, n_channels)
     :return: the embeddings as a numpy array of float32 of shape (batch_size, model_embedding_size)
     """
+    global _model
     if _model is None:
         raise Exception("Model was not loaded. Call load_model() before inference.")
     
