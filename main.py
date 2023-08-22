@@ -33,6 +33,12 @@ from synthesizer import inference as synthesizer
 from vocoder import inference as vocoder, base as voc_base
 from voicefixer import base as vf
 
+# Whisper
+import faster_whisper
+_whisper_model = None  # type: faster_whisper.WhisperModel
+
+# Init logger
+logging.basicConfig(level=logging.INFO)
 
 # Cloud Run related stuff
 app = flask.Flask(__name__)
@@ -49,6 +55,7 @@ CORS(app)
 @app.route("/render", methods=['GET', 'POST'])
 @app.route("/render_batch", methods=['GET', 'POST'])
 @app.route("/profile", methods=['GET', 'POST'])
+@app.route("/whisper", methods=['GET', 'POST'])
 def handle_request():
     # Evaluate request
     request = flask.request
@@ -86,6 +93,9 @@ def handle_request():
     if 'profile' in request.path:
         response, code = process_profile_request(request_data)
         return flask.make_response(response, code)
+    if 'whisper' in request.path:
+        response, code = process_whipser_request(request_data)
+        return flask.make_response(response, code)
     else:
         response, code = get_version(request)
         return flask.make_response(response, code)
@@ -105,7 +115,7 @@ def process_encode_request(request_data):
 
     if audio is None:
         # no speaker audio provided
-        return const.ERROR_NO_SAMPLE_PROVIDED, 400
+        return const.ERROR_NO_AUDIO_PROVIDED, 400
 
     # Generate the spectogram - if this fails, audio data provided is invalid
     try:
@@ -724,6 +734,39 @@ def process_profile_request(request_data):
     return response, 200
 
 
+def process_whipser_request(request_data):
+    global _whisper_model
+    audio = request_data["audio"] if "audio" in request_data else None
+
+    # Check input
+    if audio is None:
+        # no speaker embedding provided
+        return const.ERROR_NO_AUDIO_PROVIDED, 400
+
+    # Check Model
+    if _whisper_model is None:
+        # no speaker embedding provided
+        return const.ERROR_WHISPER_NOT_FOUND, 500
+
+    # Convert to Audio File Stream
+    audio_wav = base64.b64decode(audio.encode('utf-8'))
+    audio_data = preprocess_wav(audio_wav)
+
+    # Transcribe text
+    start = timer()
+    segments, _ = _whisper_model.transcribe(audio=audio_data, vad_filter=True)
+    result_list = [segment.text for segment in segments]
+    result = " ".join(result_list)
+    logging.log(logging.INFO, "Successfully decocded audio (%dms)." % int(1000 * (timer() - start)))
+
+    # Build response
+    response = {
+        "utterance": result
+    }
+
+    return response, 200
+
+
 # load_encoder loads the encoder into memory
 def load_encoder():
     if not encoder.is_loaded():
@@ -781,6 +824,22 @@ def load_voicefixer():
             start = timer()
             vf.load_model(const.VOICEFIXER_ANALYZER_PATH, const.VOICEFIXER_VOCODER_PATH)
             logging.log(logging.INFO, "Successfully loaded voicefixer (%dms)." % int(1000 * (timer() - start)))
+            return True
+        else:
+            return False
+    else:
+        return True
+
+
+def load_whisper():
+    global _whisper_model
+
+    if _whisper_model is None:
+        whisper_model_path = 'models/faster-whisper/{0}'.format(os.environ.get("WHISPER_MODEL_NAME"))
+        if os.path.exists(whisper_model_path):
+            start = timer()
+            _whisper_model = faster_whisper.WhisperModel(whisper_model_path)
+            logging.log(logging.INFO, "Successfully loaded whisper (%dms)." % int(1000 * (timer() - start)))
             return True
         else:
             return False
@@ -850,7 +909,8 @@ def preload_models():
     load_encoder()
     load_synthesizer()
     load_vocoder()
-    load_voicefixer()
+    #load_voicefixer()
+    load_whisper()
 
 
 # Preload Models if flag is set
